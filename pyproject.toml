@@ -1,7 +1,28 @@
 [project]
 name = "boxoban-mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "A Python game engine for Boxoban puzzles."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12" # Make sure this matches .python-version if present
 dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+# Standard configuration for projects with a 'src' layout using setuptools
+[tool.setuptools.packages.find]
+where = ["src"]  # Look for packages in the 'src' directory
+include = ["boxoban_mcp*"] # Include 'boxoban_mcp' and any submodules
+namespaces = false # Assuming boxoban_mcp is not a namespace package
+
+[tool.pytest.ini_options]
+# Add 'src' to PYTHONPATH so that pytest can find 'src.boxoban_mcp'
+# Also add '.' for any utility scripts or tests at the root that might need it.
+pythonpath = [
+    "src", "."
+]
+testpaths = [
+    "tests",
+]
