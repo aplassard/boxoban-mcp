@@ -1,1 +1,4 @@
-# This is an empty __init__.py file.
+from .game import BoxobanGame
+from .game_interface import GameInterface
+
+__all__ = ['BoxobanGame', 'GameInterface']
