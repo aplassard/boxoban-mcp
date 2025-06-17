@@ -7,13 +7,13 @@ from src.boxoban_mcp.game_interface import GameInterface
 # ####
 # #@.#  (Player at (1,1), Target at (1,2))
 # ####
-SIMPLE_BOARD_STR = "####\n#@.#\n####"
+SIMPLE_BOARD_STR = "####\\n#@.#\\n####"
 
 # Board for testing actions that might fail or involve pushes
 # #####
 # #@$ .#  (Player at (1,1), Box at (1,2), Empty at (1,3), Target at (1,4))
 # #####
-ACTION_TEST_BOARD_STR = "#####\n#@$ .#\n#####"
+ACTION_TEST_BOARD_STR = "#####\\n#@$ .#\\n#####"
 
 class TestGameInterface(unittest.TestCase):
 
@@ -40,8 +40,8 @@ class TestGameInterface(unittest.TestCase):
         # Action: 'right' -> P moves to T(1,2).
         # Old P(1,1) becomes EMPTY (' '). New P(1,2) (was TARGET '.') becomes PLAYER_ON_TARGET ('+').
         # Original row: "#@.#" (len 4). New row: "# +#" (len 4).
-        # Expected state: "####\n# +#\n####"
-        expected_state_after_move = "####\n# +#\n####"
+        # Expected state: "####\\n# +#\\n####"
+        expected_state_after_move = "####\\n# +#\\n####"
 
         result_dict = self.simple_interface.take_action('right') # Now returns a dict
 
@@ -72,12 +72,12 @@ class TestGameInterface(unittest.TestCase):
         # P(1,1), B(1,2), E(1,3), T(1,4)
         # Actions: ['right', 'right']
         # 1. 'right': Player pushes Box from (1,2) to (1,3). Player moves to (1,2). Box to (1,3).
-        #    State: #####\n# @$.#\n#####
+        #    State: #####\\n# @$.#\\n#####
         # 2. 'right': Player pushes Box from (1,3) to (1,4) (Target). Player moves to (1,3). Box to (1,4).
-        #    State: #####\n#  @*#\n##### (Player, Box on Target)
+        #    State: #####\\n#  @*#\\n##### (Player, Box on Target)
 
         actions = ['right', 'right']
-        expected_final_state = "#####\n#  @*#\n#####" # P(1,3), B(1,4) on T(1,4)
+        expected_final_state = "#####\\n#  @*#\\n#####" # P(1,3), B(1,4) on T(1,4)
 
         result = self.action_interface.take_action_list(actions)
 
@@ -89,15 +89,15 @@ class TestGameInterface(unittest.TestCase):
 
     def test_take_action_list_stops_on_fail(self):
         """Test take_action_list where an action in the middle fails."""
-        # Uses simple_interface with board: "####\n#@.#\n####"
+        # Uses simple_interface with board: "####\\n#@.#\\n####"
         # P(1,1), T(1,2)
         # Actions: ['right', 'up', 'left']
-        # 1. 'right': Success. P moves to (1,2) (on Target). State: "####\n# +#\n####"
+        # 1. 'right': Success. P moves to (1,2) (on Target). State: "####\\n# +#\\n####"
         # 2. 'up': Fails (wall). Loop should stop.
         # 3. 'left': Should not be attempted.
 
         actions = ['right', 'up', 'left']
-        expected_state_after_partial = "####\n# +#\n####" # After the first 'right'
+        expected_state_after_partial = "####\\n# +#\\n####" # After the first 'right'
 
         result = self.simple_interface.take_action_list(actions)
 
@@ -134,11 +134,11 @@ class TestGameInterface(unittest.TestCase):
         self.simple_interface.take_action('right') # P(1,1) -> P(1,2) on T
         # state: "####\n#+.#\n####"
         self.simple_interface.take_action('left')  # P(1,2) -> P(1,1) off T
-        # state: "####\n#@.#\n####"
+        # state: "####\\n#@.#\\n####"
         # This 'left' move makes player move from target (1,2) to (1,1).
         # Old spot (1,2) was target, becomes target again.
         # Player is now at (1,1).
-        # Expected state: "####\n#@.#\n####" - This is correct.
+        # Expected state: "####\\n#@.#\\n####" - This is correct.
 
         expected_state_final = SIMPLE_BOARD_STR
 
@@ -157,9 +157,9 @@ class TestGameInterface(unittest.TestCase):
 
         # Test after an action
         self.simple_interface.take_action('right')
-        # Expected state: "####\n# +#\n####" (Player moved from (1,1) to (1,2) which is target)
+        # Expected state: "####\\n# +#\\n####" (Player moved from (1,1) to (1,2) which is target)
         # (1,1) becomes EMPTY. (1,2) becomes PLAYER_ON_TARGET. (1,3) remains WALL.
-        expected_state_after_move = "####\n# +#\n####"
+        expected_state_after_move = "####\\n# +#\\n####"
         expected_dict_after = {"current_game_state": expected_state_after_move}
         self.assertEqual(self.simple_interface.return_game_state(), expected_dict_after)
 

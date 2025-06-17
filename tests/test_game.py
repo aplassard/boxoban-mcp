@@ -1,6 +1,6 @@
 import pytest
 import os
-from boxoban_mcp.game import BoxobanGame
+from src.boxoban_mcp.game import BoxobanGame
 
 # Helper to create a dummy puzzle file
 def create_dummy_puzzle_file(filepath, content):
