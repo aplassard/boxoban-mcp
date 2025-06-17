@@ -29,8 +29,8 @@ class BoxobanGame:
     def _parse_board_string(self, board_str_raw):
         board = []
         # Normalize: remove surrounding whitespace from the whole string, then split
-        # Literal '\\n' is the separator in the string format for methods like split()
-        lines = board_str_raw.strip().split('\\n')
+        # Use actual newline '\n' as separator, as loaded strings should have it.
+        lines = board_str_raw.strip().split('\n')
         for r, row_str in enumerate(lines):
             row = []
             for c, char in enumerate(row_str):
@@ -85,31 +85,37 @@ class BoxobanGame:
             raise ValueError(f"No puzzle data found in file: {file_path}")
 
         found_puzzle_str = None
-        target_prefix_for_current_index = str(puzzle_index) + "\\n"
+        # Use actual newline for prefix matching
+        target_prefix_for_current_index = str(puzzle_index) + "\n"
 
         if len(parts) == 1:
             single_part = parts[0].strip()
-            first_line_of_part = single_part.split('\\n', 1)[0]
-            is_raw_puzzle = not first_line_of_part.isdigit() # True if first line is not purely digits
+            # Split by actual newline to check header
+            header_check_parts = single_part.split('\n', 1)
+            first_line_of_part = header_check_parts[0]
+            is_raw_puzzle = not first_line_of_part.isdigit()
 
             if puzzle_index == 0:
                 if is_raw_puzzle: # e.g. "####\n#@.#\n####"
                     found_puzzle_str = single_part
                 elif single_part.startswith(target_prefix_for_current_index): # e.g. "0\n####\n#@.#\n####"
-                    found_puzzle_str = single_part[len(target_prefix_for_current_index):].strip()
+                    found_puzzle_str = header_check_parts[1].strip() if len(header_check_parts) > 1 else ""
             # If index > 0, it must have the "N\n" header
             elif single_part.startswith(target_prefix_for_current_index):
-                 found_puzzle_str = single_part[len(target_prefix_for_current_index):].strip()
+                 found_puzzle_str = header_check_parts[1].strip() if len(header_check_parts) > 1 else ""
 
         if found_puzzle_str is None: # Search through multiple parts or if not found in single part logic
             for part in parts:
                 current_part = part.strip()
                 if current_part.startswith(target_prefix_for_current_index):
-                    found_puzzle_str = current_part[len(target_prefix_for_current_index):].strip()
+                    # Split by actual newline to extract puzzle string after header
+                    puzzle_content_parts = current_part.split('\n', 1)
+                    found_puzzle_str = puzzle_content_parts[1].strip() if len(puzzle_content_parts) > 1 else ""
                     break
 
         if found_puzzle_str is None:
-            available_puzzle_headers = [p.strip().split('\\n',1)[0] for p in parts if p.strip()]
+            # Split by actual newline for displaying available headers
+            available_puzzle_headers = [p.strip().split('\n',1)[0] for p in parts if p.strip()]
             raise ValueError(
                 f"Puzzle with index {puzzle_index} (expected prefix '{target_prefix_for_current_index.strip()}') "
                 f"not found in {file_path}. File contains {len(parts)} part(s). "
@@ -146,7 +152,7 @@ class BoxobanGame:
                 else:
                     row_str_parts.append(char_code)
             output_rows.append("".join(row_str_parts))
-        return "\\n".join(output_rows) # Use '\n' for string representation
+        return "\n".join(output_rows) # Use actual newline for string representation
 
     def _simulate_move_on_temp_board(self, temp_board, temp_player_pos, action):
         r_player, c_player = temp_player_pos
