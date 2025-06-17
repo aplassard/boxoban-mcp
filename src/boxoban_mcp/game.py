@@ -29,8 +29,8 @@ class BoxobanGame:
     def _parse_board_string(self, board_str_raw):
         board = []
         # Normalize: remove surrounding whitespace from the whole string, then split
-        # Literal '\\n' is the separator in the string format for methods like split()
-        lines = board_str_raw.strip().split('\\n')
+        # Use '\n' as the separator for actual newline characters.
+        lines = board_str_raw.strip().split('\n')
         for r, row_str in enumerate(lines):
             row = []
             for c, char in enumerate(row_str):
@@ -146,7 +146,7 @@ class BoxobanGame:
                 else:
                     row_str_parts.append(char_code)
             output_rows.append("".join(row_str_parts))
-        return "\\n".join(output_rows) # Use '\n' for string representation
+        return "\n".join(output_rows) # Use '\n' for string representation
 
     def get_valid_moves(self):
         valid = []
