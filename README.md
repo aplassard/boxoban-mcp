@@ -2,6 +2,27 @@
 
 This repository provides a Python-based game engine for Boxoban, a box-pushing puzzle game inspired by Sokoban. The engine allows for loading game levels, representing the game state, identifying valid moves, and taking actions.
 
+## Installation
+
+To use the `BoxobanGame` class in your own projects, you first need to install it. Navigate to the root directory of this repository in your terminal.
+
+It's recommended to use a virtual environment:
+```bash
+uv venv
+source .venv/bin/activate  # On Windows use `.venv\Scripts\activate`
+```
+
+Then, install the package. For a regular install:
+```bash
+uv pip install .
+```
+For an editable install (allows you to make changes to the source code and have them immediately reflected):
+```bash
+uv pip install -e .
+```
+
+After installation, you can import the game class as shown in the examples below.
+
 ## Game Representation
 
 The game is played on a grid. The following symbols are used to represent the game elements:
@@ -18,7 +39,7 @@ The objective of the game is to push all boxes (`$`) onto all target squares (`.
 
 ## `BoxobanGame` Class
 
-The core of the engine is the `BoxobanGame` class, located in `src.boxoban_mcp.game`.
+The core of the engine is the `BoxobanGame` class, located in `boxoban_mcp.game` once installed.
 
 ### Initialization and Loading Games
 
@@ -26,9 +47,9 @@ You can load a game in several ways:
 
 1.  **From a string:**
     ```python
-    from src.boxoban_mcp.game import BoxobanGame
+    from boxoban_mcp.game import BoxobanGame
 
-    board_string = "####\n#@$.#\n####"
+    board_string = "####\\n#@$.#\\n####"
     # Represents:
     # ####
     # #@$.#  (Player, Box, Target)
@@ -39,8 +60,10 @@ You can load a game in several ways:
 2.  **From a file:**
     Puzzle files can contain multiple puzzles, separated by a semicolon and a puzzle number (e.g., `0\nPuzzleData0;1\nPuzzleData1`).
     ```python
+    from boxoban_mcp.game import BoxobanGame # Assuming it might not be imported yet
+
     # Assuming 'puzzles/medium/train/000.txt' exists
-    # And puzzle 0 in that file is "####\n#@.#\n####"
+    # And puzzle 0 in that file is "####\\n#@.#\\n####"
     game = BoxobanGame.load_game_from_file("puzzles/medium/train/000.txt", puzzle_index=0)
     ```
     If a file contains only a single puzzle string without a preceding index number, use `puzzle_index=0`.
@@ -48,6 +71,8 @@ You can load a game in several ways:
 3.  **From parameters:**
     This method constructs the path to standard puzzle files within the `puzzles/` directory.
     ```python
+    from boxoban_mcp.game import BoxobanGame # Assuming it might not be imported yet
+
     # Loads puzzle 12 from puzzles/medium/train/001.txt
     game = BoxobanGame.load_game_from_params(
         difficulty="medium",
@@ -102,11 +127,11 @@ Once a game is loaded:
 This project uses `uv` for package management and `pytest` for testing.
 
 1.  **Setup (using uv):**
-    It's recommended to set up a virtual environment.
+    If you plan to contribute or run tests, set up a virtual environment and install development dependencies:
     ```bash
     uv venv
     source .venv/bin/activate
-    uv pip install pytest
+    uv pip install -e .[dev] # Installs the package in editable mode along with dev dependencies like pytest
     ```
 
 2.  **Running Tests:**
