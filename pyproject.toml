@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "A Python game engine for Boxoban puzzles."
 readme = "README.md"
 requires-python = ">=3.12" # Make sure this matches .python-version if present
-dependencies = []
+dependencies = [
+    "numpy>=2.3.0",
+    "scipy>=1.15.3",
+]
 
 [project.optional-dependencies]
 dev = [
