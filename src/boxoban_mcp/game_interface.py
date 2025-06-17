@@ -11,9 +11,9 @@ class GameInterface:
         """
         self.game = game
         self.actions_taken_list = []
-        self.total_actions_taken_count = 0
+        # self.total_actions_taken_count = 0  <- This line is removed
 
-    def take_action(self, action: str) -> tuple[str, bool]:
+    def take_action(self, action: str) -> dict: # Changed return type hint
         """
         Attempts to take a single action in the game.
 
@@ -21,15 +21,15 @@ class GameInterface:
             action: The action string (e.g., 'up', 'down', 'left', 'right').
 
         Returns:
-            A tuple containing:
-                - The current game state (string) after the action.
-                - A boolean indicating if the action was successful.
+            A dictionary containing:
+                - "game_state": The current game state (string) after the action.
+                - "success": A boolean indicating if the action was successful.
         """
         success = self.game.take_action(action)
         if success:
             self.actions_taken_list.append(action)
-            self.total_actions_taken_count += 1
-        return self.game.get_game_state(), success
+            # The line incrementing total_actions_taken_count is removed
+        return {"game_state": self.game.get_game_state(), "success": success}
 
     def take_action_list(self, actions: list[str]) -> dict:
         """
@@ -46,15 +46,15 @@ class GameInterface:
         """
         actions_attempted = len(actions)
         actions_successful = 0
-        current_game_state = self.game.get_game_state() # Initial state before any action in this list
+        current_game_state = self.game.get_game_state()
 
-        for action in actions:
-            game_state_after_action, success = self.take_action(action)
-            current_game_state = game_state_after_action # Update state regardless of success for the return value
-            if success:
+        for action_item in actions: # Renamed 'action' to 'action_item' to avoid conflict with method name
+            result_dict = self.take_action(action_item) # Now returns a dict
+            current_game_state = result_dict["game_state"]
+            if result_dict["success"]:
                 actions_successful += 1
             else:
-                break  # Stop on the first illegal action
+                break
 
         return {
             "current_game_state": current_game_state,
@@ -75,7 +75,7 @@ class GameInterface:
         """
         return {
             "current_game_state": self.game.get_game_state(),
-            "total_actions_successfully_taken": self.total_actions_taken_count,
+            "total_actions_successfully_taken": len(self.actions_taken_list), # Updated to use len()
             "list_of_actions_successfully_taken": self.actions_taken_list
         }
 

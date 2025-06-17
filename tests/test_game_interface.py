@@ -31,7 +31,7 @@ class TestGameInterface(unittest.TestCase):
         """Test that the GameInterface initializes correctly."""
         self.assertIsNotNone(self.simple_interface.game)
         self.assertEqual(self.simple_interface.actions_taken_list, [])
-        self.assertEqual(self.simple_interface.total_actions_taken_count, 0)
+        # self.assertEqual(self.simple_interface.total_actions_taken_count, 0) # Removed
         self.assertEqual(self.simple_interface.game.get_game_state(), SIMPLE_BOARD_STR)
 
     def test_take_action_successful(self):
@@ -43,11 +43,11 @@ class TestGameInterface(unittest.TestCase):
         # Expected state: "####\n# +#\n####"
         expected_state_after_move = "####\n# +#\n####"
 
-        game_state, success = self.simple_interface.take_action('right')
+        result_dict = self.simple_interface.take_action('right') # Now returns a dict
 
-        self.assertTrue(success)
-        self.assertEqual(game_state, expected_state_after_move)
-        self.assertEqual(self.simple_interface.total_actions_taken_count, 1)
+        self.assertTrue(result_dict["success"])
+        self.assertEqual(result_dict["game_state"], expected_state_after_move)
+        self.assertEqual(len(self.simple_interface.actions_taken_list), 1) # Check via len
         self.assertEqual(self.simple_interface.actions_taken_list, ['right'])
         # Verify game state via interface method too
         self.assertEqual(self.simple_interface.return_game_state()['current_game_state'], expected_state_after_move)
@@ -58,11 +58,11 @@ class TestGameInterface(unittest.TestCase):
         # Action: 'up' (into a wall)
         # Expected state: "####\n#@.#\n####" (no change)
 
-        game_state, success = self.simple_interface.take_action('up')
+        result_dict = self.simple_interface.take_action('up') # Now returns a dict
 
-        self.assertFalse(success)
-        self.assertEqual(game_state, SIMPLE_BOARD_STR)
-        self.assertEqual(self.simple_interface.total_actions_taken_count, 0)
+        self.assertFalse(result_dict["success"])
+        self.assertEqual(result_dict["game_state"], SIMPLE_BOARD_STR)
+        self.assertEqual(len(self.simple_interface.actions_taken_list), 0) # Check via len
         self.assertEqual(self.simple_interface.actions_taken_list, [])
         self.assertEqual(self.simple_interface.return_game_state()['current_game_state'], SIMPLE_BOARD_STR)
 
@@ -84,7 +84,7 @@ class TestGameInterface(unittest.TestCase):
         self.assertEqual(result['actions_sent'], 2)
         self.assertEqual(result['actions_taken'], 2)
         self.assertEqual(result['current_game_state'], expected_final_state)
-        self.assertEqual(self.action_interface.total_actions_taken_count, 2)
+        self.assertEqual(len(self.action_interface.actions_taken_list), 2) # Check via len
         self.assertEqual(self.action_interface.actions_taken_list, ['right', 'right'])
 
     def test_take_action_list_stops_on_fail(self):
@@ -104,7 +104,7 @@ class TestGameInterface(unittest.TestCase):
         self.assertEqual(result['actions_sent'], 3)
         self.assertEqual(result['actions_taken'], 1) # Only 'right' succeeded
         self.assertEqual(result['current_game_state'], expected_state_after_partial)
-        self.assertEqual(self.simple_interface.total_actions_taken_count, 1)
+        self.assertEqual(len(self.simple_interface.actions_taken_list), 1) # Check via len
         self.assertEqual(self.simple_interface.actions_taken_list, ['right'])
 
     def test_take_action_list_empty(self):
@@ -117,7 +117,7 @@ class TestGameInterface(unittest.TestCase):
         self.assertEqual(result['actions_sent'], 0)
         self.assertEqual(result['actions_taken'], 0)
         self.assertEqual(result['current_game_state'], initial_state) # State should be unchanged
-        self.assertEqual(self.simple_interface.total_actions_taken_count, 0)
+        self.assertEqual(len(self.simple_interface.actions_taken_list), 0) # Check via len
         self.assertEqual(self.simple_interface.actions_taken_list, [])
 
     def test_return_full_game_state_no_actions(self):
