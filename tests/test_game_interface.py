@@ -163,5 +163,127 @@ class TestGameInterface(unittest.TestCase):
         expected_dict_after = {"current_game_state": expected_state_after_move}
         self.assertEqual(self.simple_interface.return_game_state(), expected_dict_after)
 
+    # --- Tests for get_heuristic_score ---
+
+    def test_get_heuristic_score_standard_case(self):
+        """Test heuristic score for a standard board configuration."""
+        board_str = "#######\n#.  $ #\n# $ @ #\n# .   #\n#######"
+        # Boxes at (1,4) and (2,2)
+        # Goals at (1,1) and (3,2)
+        # Distances:
+        # Box (1,4) to Goal (1,1): |1-1| + |4-1| = 3
+        # Box (1,4) to Goal (3,2): |1-3| + |4-2| = 2 + 2 = 4
+        # Box (2,2) to Goal (1,1): |2-1| + |2-1| = 1 + 1 = 2
+        # Box (2,2) to Goal (3,2): |2-3| + |2-2| = 1 + 0 = 1
+        # Cost Matrix:
+        #      G(1,1) G(3,2)
+        # B(1,4) [ 3      4 ]
+        # B(2,2) [ 2      1 ]
+        # Optimal assignment: B(1,4) -> G(1,1) (cost 3) and B(2,2) -> G(3,2) (cost 1) -> Total = 4. NO
+        # Optimal assignment: B(1,4) -> G(3,2) (cost 4) and B(2,2) -> G(1,1) (cost 2) -> Total = 6.
+        # Optimal assignment using scipy: B(1,4) to G(1,1) (3) + B(2,2) to G(3,2) (1) = 4. Wait, linear_sum_assignment
+        # B(1,4) can go to G(1,1) (cost 3) or G(3,2) (cost 4)
+        # B(2,2) can go to G(1,1) (cost 2) or G(3,2) (cost 1)
+        # Assignments:
+        # 1. B(1,4)->G(1,1) (3), B(2,2)->G(3,2) (1) = Sum 4
+        # 2. B(1,4)->G(3,2) (4), B(2,2)->G(1,1) (2) = Sum 6
+        # Minimum is 4.
+        # The example from the issue:
+        # ['#', '#', '#', '#', '#', '#', '#'],
+        # ['#', '.', ' ', ' ', ' ', ' ', '#'], (G1 at (1,1))
+        # ['#', ' ', '$', '#', '$', ' ', '#'], (B1 at (2,2), B2 at (2,4))
+        # ['#', ' ', ' ', '.', ' ', '@', '#'], (G2 at (3,3)) Player at (3,5)
+        # ['#', '#', '#', '#', '#', '#', '#']
+        # B1(2,2) to G1(1,1): |2-1|+|2-1| = 1+1=2
+        # B1(2,2) to G2(3,3): |2-3|+|2-3| = 1+1=2
+        # B2(2,4) to G1(1,1): |2-1|+|4-1| = 1+3=4
+        # B2(2,4) to G2(3,3): |2-3|+|4-3| = 1+1=2
+        # Cost Matrix:
+        #      G1(1,1) G2(3,3)
+        # B1(2,2) [ 2      2 ]
+        # B2(2,4) [ 4      2 ]
+        # Assignments:
+        # 1. B1->G1 (2), B2->G2 (2) = Sum 4
+        # 2. B1->G2 (2), B2->G1 (4) = Sum 6
+        # Minimum is 4.
+        # REVISED CALCULATION FOR THE ACTUAL BOARD:
+        # Board:
+        # #######
+        # #.    #  G1 at (1,1)
+        # # $ # $ #  B1 at (2,2), B2 at (2,6) (Note: X coordinate is 6, not 4)
+        # #   . @#  G2 at (3,4) (Note: Y coordinate is 4, not 3)
+        # #######
+        # Distances:
+        # B1(2,2) to G1(1,1): |2-1|+|2-1| = 1+1 = 2
+        # B1(2,2) to G2(3,4): |2-3|+|2-4| = 1+2 = 3
+        # B2(2,6) to G1(1,1): |2-1|+|6-1| = 1+5 = 6
+        # B2(2,6) to G2(3,4): |2-3|+|6-4| = 1+2 = 3
+        # Cost Matrix:
+        #        G1(1,1) G2(3,4)
+        # B1(2,2) [  2       3   ]
+        # B2(2,6) [  6       3   ]
+        # Optimal assignment: B1->G1 (cost 2), B2->G2 (cost 3) = Sum 5.
+        # (Alternative: B1->G2 (cost 3), B2->G1 (cost 6) = Sum 9)
+        # So, the correct expected score is 5.0.
+        board_str_issue = "#######\n#.    #\n# $ # $ #\n#   . @#\n#######"
+        game = BoxobanGame.load_game_from_string(board_str_issue)
+        interface = GameInterface(game)
+        self.assertEqual(interface.get_heuristic_score(), 5.0)
+
+    def test_get_heuristic_score_box_on_goal(self):
+        """Test heuristic score when a box is already on a goal."""
+        # Box at (1,1) is on a goal, another goal at (1,3)
+        # Player at (2,2)
+        board_str = "#####\n#* .#\n# @ #\n#####"
+        # B1(1,1) on G1(1,1). G2 at (1,3)
+        # Box B1(1,1)
+        # Goals G1(1,1), G2(1,3)
+        # Cost matrix:
+        #        G1(1,1)  G2(1,3)
+        # B1(1,1) [  0        2  ]
+        # Optimal: B1 -> G1 (cost 0)
+        # Score should be 0.
+        game = BoxobanGame.load_game_from_string(board_str)
+        interface = GameInterface(game)
+        self.assertEqual(interface.get_heuristic_score(), 0.0)
+
+    def test_get_heuristic_score_mismatched_boxes_goals_no_goals(self):
+        """Test heuristic score with boxes but no goals."""
+        # Box at (1,1), Player at (2,2)
+        # No goals on the board
+        board_str = "#####\n#$  #\n# @ #\n#####"
+        game = BoxobanGame.load_game_from_string(board_str)
+        interface = GameInterface(game)
+        self.assertEqual(interface.get_heuristic_score(), float('inf'))
+
+    def test_get_heuristic_score_mismatched_boxes_goals_fewer_goals(self):
+        """Test heuristic score with more boxes than goals."""
+        # Boxes at (1,1) and (1,3), Goal at (2,2) Player at (3,2)
+        # B1(1,1) to G1(2,2): |1-2|+|1-2| = 1+1=2
+        # B2(1,3) to G1(2,2): |1-2|+|3-2| = 1+1=2
+        # Cost matrix (Boxes x Goals):
+        #        G1(2,2)
+        # B1(1,1)  [ 2 ]
+        # B2(1,3)  [ 2 ]
+        # linear_sum_assignment will pick one of these, e.g. B1->G1 (cost 2) or B2->G1 (cost 2)
+        # The sum will be 2.
+        board_str = "#####\n#$ $#\n# . #\n# @ #\n#####"
+        game = BoxobanGame.load_game_from_string(board_str)
+        interface = GameInterface(game)
+        # According to the issue description, if boxes and goals don't match, it should be float('inf').
+        # The current implementation of calculate_greedy_score might not do this yet if len(goals)>0.
+        # This test is set up to expect float('inf') as per the requirement.
+        self.assertEqual(interface.get_heuristic_score(), float('inf'))
+
+
+    def test_get_heuristic_score_no_boxes(self):
+        """Test heuristic score when there are no boxes."""
+        # Goal at (1,1), Player at (2,2)
+        # No boxes on the board
+        board_str = "#####\n#.  #\n# @ #\n#####"
+        game = BoxobanGame.load_game_from_string(board_str)
+        interface = GameInterface(game)
+        self.assertEqual(interface.get_heuristic_score(), 0.0)
+
 if __name__ == '__main__':
     unittest.main()
