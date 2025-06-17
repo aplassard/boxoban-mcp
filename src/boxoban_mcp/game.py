@@ -148,13 +148,37 @@ class BoxobanGame:
             output_rows.append("".join(row_str_parts))
         return "\\n".join(output_rows) # Use '\n' for string representation
 
+    def _simulate_move_on_temp_board(self, temp_board, temp_player_pos, action):
+        r_player, c_player = temp_player_pos
+        dr, dc = self.ACTION_MAP[action]
+        nr, nc = r_player + dr, c_player + dc
+
+        # Determine character for player's old spot
+        player_old_pos_char = self.TARGET if (r_player, c_player) in self._targets else self.EMPTY
+
+        if temp_board[nr][nc] == self.BOX:
+            bnr, bnc = nr + dr, nc + dc
+            # Determine character for box's old spot (player's new spot before player moves)
+            box_old_pos_char = self.TARGET if (nr, nc) in self._targets else self.EMPTY
+            temp_board[bnr][bnc] = self.BOX       # Move box to its new position
+            temp_board[nr][nc] = box_old_pos_char # Set box's old spot character (player will occupy this)
+
+        temp_board[r_player][c_player] = player_old_pos_char # Set player's old spot character
+        temp_board[nr][nc] = self.PLAYER                     # Move player to new spot
+
+        return temp_board, [nr, nc]
+
     def get_valid_moves(self):
-        valid = []
+        # original_player_pos = list(self.player_pos) # Not strictly needed as self.player_pos isn't modified by simulation
+        # original_board = [row[:] for row in self.board] # Not strictly needed as self.board isn't modified by simulation
+
+        candidate_moves = []
         r_player, c_player = self.player_pos
 
         for move_name, (dr, dc) in self.ACTION_MAP.items():
             nr, nc = r_player + dr, c_player + dc
 
+            # Check boundaries for player's new position
             if not (0 <= nr < len(self.board) and 0 <= nc < len(self.board[0])):
                 continue
 
@@ -163,6 +187,7 @@ class BoxobanGame:
             if char_at_new_pos == self.WALL:
                 continue
             elif char_at_new_pos == self.BOX:
+                # Check boundaries and content for box's new position (one step further)
                 bnr, bnc = nr + dr, nc + dc
                 if not (0 <= bnr < len(self.board) and 0 <= bnc < len(self.board[0])):
                     continue
@@ -171,8 +196,20 @@ class BoxobanGame:
                 if char_behind_box == self.WALL or char_behind_box == self.BOX:
                     continue
 
-            valid.append(move_name)
-        return valid
+            candidate_moves.append(move_name)
+
+        final_valid_moves = []
+        for move_name in candidate_moves:
+            temp_player_pos = list(self.player_pos) # Use a copy for simulation
+            temp_board = [row[:] for row in self.board] # Use a deep copy for simulation
+
+            simulated_board, _ = self._simulate_move_on_temp_board(temp_board, temp_player_pos, move_name)
+
+            is_resulting_deadlock = self._is_deadlock(simulated_board)
+            if not is_resulting_deadlock:
+                final_valid_moves.append(move_name)
+
+        return final_valid_moves
 
     def take_action(self, action):
         if action not in self.ACTION_MAP:
@@ -227,3 +264,102 @@ class BoxobanGame:
                 if char_code == self.BOX and (r_idx, c_idx) not in self._targets:
                     return False # A box is on a non-target square
         return True
+
+    def _is_deadlock(self, board):
+        # Helper function to check if a position is a wall
+        def is_wall(r, c):
+            return not (0 <= r < len(board) and 0 <= c < len(board[0])) or \
+                   board[r][c] == self.WALL
+
+        for r, row in enumerate(board):
+            for c, char_code in enumerate(row):
+                if char_code == self.BOX:
+                    # If the box is on a target, it's not a deadlock from this box's perspective
+                    if (r, c) in self._targets:
+                        continue
+
+                    # Simple Corner Deadlock: Box in a corner formed by two walls
+                    # Check corners: (Up, Left), (Up, Right), (Down, Left), (Down, Right)
+                    if (is_wall(r - 1, c) and is_wall(r, c - 1)) or \
+                       (is_wall(r - 1, c) and is_wall(r, c + 1)) or \
+                       (is_wall(r + 1, c) and is_wall(r, c - 1)) or \
+                       (is_wall(r + 1, c) and is_wall(r, c + 1)):
+                        # This is a simple corner, and the box is not on a target.
+                        return True
+
+                    # Frozen Against a Wall Deadlock (Exact match to issue snippet logic)
+                    height = len(board)
+                    width = len(board[0])
+
+                    # Rule 1: Vertical Wall Freeze (North or South wall)
+                    if is_wall(r - 1, c) or is_wall(r + 1, c): # Box is against a North or South wall
+                        can_move_out_vertical = False
+                        # Scan Left
+                        temp_c = c
+                        while temp_c - 1 >= 0 and board[r][temp_c - 1] != self.WALL:
+                            if (r, temp_c - 1) in self._targets:
+                                can_move_out_vertical = True; break
+                            if board[r][temp_c - 1] == self.BOX: # Blocked by another box
+                                break
+                            temp_c -= 1
+
+                        if not can_move_out_vertical:
+                            # Scan Right
+                            temp_c = c
+                            while temp_c + 1 < width and board[r][temp_c + 1] != self.WALL:
+                                if (r, temp_c + 1) in self._targets:
+                                    can_move_out_vertical = True; break
+                                if board[r][temp_c + 1] == self.BOX: # Blocked by another box
+                                    break
+                                temp_c += 1
+
+                        if not can_move_out_vertical:
+                            return True # Deadlock: Frozen against N/S wall
+
+                    # Rule 2: Horizontal Wall Freeze (West or East wall)
+                    if is_wall(r, c - 1) or is_wall(r, c + 1): # Box is against a West or East wall
+                        can_move_out_horizontal = False
+                        # Scan Up
+                        temp_r = r
+                        while temp_r - 1 >= 0 and board[temp_r - 1][c] != self.WALL:
+                            if (temp_r - 1, c) in self._targets:
+                                can_move_out_horizontal = True; break
+                            if board[temp_r - 1][c] == self.BOX: # Blocked by another box
+                                break
+                            temp_r -= 1
+
+                        if not can_move_out_horizontal:
+                            # Scan Down
+                            temp_r = r
+                            while temp_r + 1 < height and board[temp_r + 1][c] != self.WALL:
+                                if (temp_r + 1, c) in self._targets:
+                                    can_move_out_horizontal = True; break
+                                if board[temp_r + 1][c] == self.BOX: # Blocked by another box
+                                    break
+                                temp_r += 1
+
+                        if not can_move_out_horizontal:
+                            return True # Deadlock: Frozen against E/W wall
+
+                    # 2x2 Box Deadlock
+                    # Check for a 2x2 square of boxes. If such a square exists and none are on a goal, it's a deadlock.
+                    # More strongly: if a 2x2 of boxes exists, it's a deadlock if not ALL of them are on goals.
+                    # Even more strongly: any 2x2 of boxes is an immediate deadlock as none can be moved.
+                    # Let's check if (r,c), (r+1,c), (r,c+1), (r+1,c+1) are all boxes.
+                    # The loop is iterating (r,c) for a box. So we check its neighbors.
+                    if board[r][c] == self.BOX: # Current is a box
+                        # Check (r, c+1), (r+1, c), (r+1, c+1)
+                        if (r + 1 < len(board) and c + 1 < len(board[0]) and
+                            board[r][c+1] == self.BOX and
+                            board[r+1][c] == self.BOX and
+                            board[r+1][c+1] == self.BOX):
+                            # Found a 2x2 group of boxes.
+                            # According to the issue: "if all four squares are boxes, and none of them are on a goal square"
+                            # However, a 2x2 of boxes is always a deadlock unless the game is already solved by this 2x2.
+                            # If any of these 4 boxes is NOT on a target, it's a deadlock.
+                            if not ((r,c) in self._targets and \
+                                    (r,c+1) in self._targets and \
+                                    (r+1,c) in self._targets and \
+                                    (r+1,c+1) in self._targets):
+                                return True
+        return False
