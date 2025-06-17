@@ -111,13 +111,16 @@ class GameInterface:
 
         for r in range(rows):
             for c in range(cols):
-                if board[r][c] == '$':  # Box
-                    box_locs.append((r, c))
-                elif board[r][c] == '.':  # Goal
-                    goal_locs.append((r, c))
-                elif board[r][c] == '*':  # Box on goal
-                    box_locs.append((r, c))
-                    goal_locs.append((r, c))
+                if c < len(board[r]): # Check if column index is valid for the current row
+                    char = board[r][c]
+                    if char == '$':  # Box
+                        box_locs.append((r, c))
+                    elif char == '.':  # Goal
+                        goal_locs.append((r, c))
+                    elif char == '*':  # Box on goal
+                        box_locs.append((r, c))
+                        goal_locs.append((r, c))
+                # If c >= len(board[r]), it's part of a jagged array from parsing, treat as empty space
 
         # If there are no boxes, the score is 0 (puzzle solved or trivial).
         if not box_locs:

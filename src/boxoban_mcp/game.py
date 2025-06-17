@@ -1,4 +1,5 @@
 import os
+import numpy as np
 
 class BoxobanGame:
     EMPTY = ' '
@@ -8,6 +9,14 @@ class BoxobanGame:
     TARGET = '.'
     BOX_ON_TARGET = '*'  # For get_game_state: Box ($) on a destination (.)
     PLAYER_ON_TARGET = '+' # For get_game_state: Player character (@) on a destination
+
+    ORD_EMPTY = ord(EMPTY)
+    ORD_WALL = ord(WALL)
+    ORD_PLAYER = ord(PLAYER)
+    ORD_BOX = ord(BOX)
+    ORD_TARGET = ord(TARGET)
+    ORD_PLAYER_ON_TARGET = ord(PLAYER_ON_TARGET)
+    ORD_BOX_ON_TARGET = ord(BOX_ON_TARGET)
 
     ACTION_MAP = {
         'up': (-1, 0),
@@ -19,54 +28,61 @@ class BoxobanGame:
 
     def __init__(self, board_string):
         self.board_string_raw = board_string # Keep original for debugging if needed
-        self._targets = set()
-        self.board = self._parse_board_string(board_string)
-        self.player_pos = self._find_player_position()
+        self._targets: set[tuple[int, int]] = set()
+        self.board: np.ndarray | None = None # Will be initialized by _parse_board_string
+        self._parse_board_string(board_string)
+        self.player_pos: tuple[int, int] | None = self._find_player_position() # player_pos is (r, c)
         if self.player_pos is None:
             # This case should ideally be caught by _parse_board_string if player char is missing
             raise ValueError("Player ('@' or '+') not found on the board.")
 
     def _parse_board_string(self, board_str_raw):
-        board = []
+        board_chars = []
         # Normalize: remove surrounding whitespace from the whole string, then split
         # Use actual newline '\n' as separator, as loaded strings should have it.
         lines = board_str_raw.strip().split('\n')
+        max_len = 0
         for r, row_str in enumerate(lines):
-            row = []
+            row_chars = []
+            max_len = max(max_len, len(row_str))
             for c, char in enumerate(row_str):
+                actual_char_to_store = self.EMPTY
                 if char == self.TARGET:
                     self._targets.add((r, c))
-                    row.append(self.TARGET)
+                    actual_char_to_store = self.TARGET
                 elif char == self.PLAYER_ON_TARGET:
                     self._targets.add((r, c))
-                    row.append(self.PLAYER) # Store as PLAYER, target status is in _targets
+                    actual_char_to_store = self.PLAYER # Store as PLAYER, target status is in _targets
                 elif char == self.BOX_ON_TARGET:
                     self._targets.add((r, c))
-                    row.append(self.BOX)    # Store as BOX, target status is in _targets
+                    actual_char_to_store = self.BOX    # Store as BOX, target status is in _targets
                 elif char == self.PLAYER:
-                    row.append(self.PLAYER)
+                    actual_char_to_store = self.PLAYER
                 elif char == self.BOX:
-                    row.append(self.BOX)
+                    actual_char_to_store = self.BOX
                 elif char == self.WALL:
-                    row.append(self.WALL)
+                    actual_char_to_store = self.WALL
                 elif char == self.EMPTY:
-                    row.append(self.EMPTY)
-                else:
-                    # If character is unknown, treat as empty or raise error
-                    # For now, let's treat as empty, could be safer to raise error
-                    row.append(self.EMPTY)
-            board.append(row)
+                    actual_char_to_store = self.EMPTY
+                # else: unknown chars are treated as EMPTY (already default)
+                row_chars.append(ord(actual_char_to_store))
+            board_chars.append(row_chars)
 
-        if board and any(len(r) != len(board[0]) for r in board):
-            pass # Not strictly enforcing rectangularity
+        # Pad rows to ensure rectangular board for NumPy array
+        # Using ORD_EMPTY for padding
+        num_rows = len(board_chars)
+        self.board = np.full((num_rows, max_len), self.ORD_EMPTY, dtype=np.uint8)
+        for r, row_data in enumerate(board_chars):
+            self.board[r, :len(row_data)] = row_data
 
-        return board
+        # _find_player_position will use self.board, so it's called after self.board is set.
 
     def _find_player_position(self):
-        for r, row in enumerate(self.board):
-            for c, char in enumerate(row):
-                if char == self.PLAYER:
-                    return [r, c]
+        # Player position is stored based on ORD_PLAYER in the numpy array
+        player_coords = np.where(self.board == self.ORD_PLAYER)
+        if player_coords[0].size > 0:
+            # Return as a tuple (r, c)
+            return (player_coords[0][0], player_coords[1][0])
         return None
 
     @classmethod
@@ -137,79 +153,79 @@ class BoxobanGame:
 
     def get_game_state(self):
         output_rows = []
-        for r, row_list in enumerate(self.board):
+        for r in range(self.board.shape[0]):
             row_str_parts = []
-            for c, char_code in enumerate(row_list):
+            for c in range(self.board.shape[1]):
+                char_ord = self.board[r, c]
                 is_target = (r, c) in self._targets
-                if char_code == self.PLAYER and is_target:
+
+                if char_ord == self.ORD_PLAYER and is_target:
                     row_str_parts.append(self.PLAYER_ON_TARGET)
-                elif char_code == self.BOX and is_target:
+                elif char_ord == self.ORD_BOX and is_target:
                     row_str_parts.append(self.BOX_ON_TARGET)
-                elif char_code == self.TARGET:
+                elif char_ord == self.ORD_TARGET: # Should display TARGET if it's an empty target
                     row_str_parts.append(self.TARGET)
-                elif char_code == self.EMPTY and is_target: # Empty space that is a target
+                elif char_ord == self.ORD_EMPTY and is_target: # Empty space that is a target
                     row_str_parts.append(self.TARGET)
                 else:
-                    row_str_parts.append(char_code)
+                    row_str_parts.append(chr(char_ord)) # Convert ord back to char
             output_rows.append("".join(row_str_parts))
         return "\n".join(output_rows) # Use actual newline for string representation
 
-    def _simulate_move_on_temp_board(self, temp_board, temp_player_pos, action):
+    def _simulate_move_on_temp_board(self, temp_board: np.ndarray, temp_player_pos: tuple[int, int], action: str):
         r_player, c_player = temp_player_pos
         dr, dc = self.ACTION_MAP[action]
         nr, nc = r_player + dr, c_player + dc
 
         # Determine character for player's old spot
-        player_old_pos_char = self.TARGET if (r_player, c_player) in self._targets else self.EMPTY
+        player_old_pos_char_ord = self.ORD_TARGET if (r_player, c_player) in self._targets else self.ORD_EMPTY
 
-        if temp_board[nr][nc] == self.BOX:
+        if temp_board[nr, nc] == self.ORD_BOX: # Check using ORD_BOX
             bnr, bnc = nr + dr, nc + dc
             # Determine character for box's old spot (player's new spot before player moves)
-            box_old_pos_char = self.TARGET if (nr, nc) in self._targets else self.EMPTY
-            temp_board[bnr][bnc] = self.BOX       # Move box to its new position
-            temp_board[nr][nc] = box_old_pos_char # Set box's old spot character (player will occupy this)
+            box_old_pos_char_ord = self.ORD_TARGET if (nr, nc) in self._targets else self.ORD_EMPTY
+            temp_board[bnr, bnc] = self.ORD_BOX       # Move box to its new position
+            temp_board[nr, nc] = box_old_pos_char_ord # Set box's old spot character (player will occupy this)
 
-        temp_board[r_player][c_player] = player_old_pos_char # Set player's old spot character
-        temp_board[nr][nc] = self.PLAYER                     # Move player to new spot
+        temp_board[r_player, c_player] = player_old_pos_char_ord # Set player's old spot character
+        temp_board[nr, nc] = self.ORD_PLAYER                     # Move player to new spot
 
-        return temp_board, [nr, nc]
+        return temp_board, (nr, nc) # Return new player position as tuple
 
     def get_valid_moves(self):
-        # original_player_pos = list(self.player_pos) # Not strictly needed as self.player_pos isn't modified by simulation
-        # original_board = [row[:] for row in self.board] # Not strictly needed as self.board isn't modified by simulation
-
         candidate_moves = []
-        r_player, c_player = self.player_pos
+        r_player, c_player = self.player_pos # player_pos is now a tuple (r,c)
 
         for move_name, (dr, dc) in self.ACTION_MAP.items():
             nr, nc = r_player + dr, c_player + dc
 
             # Check boundaries for player's new position
-            if not (0 <= nr < len(self.board) and 0 <= nc < len(self.board[0])):
+            if not (0 <= nr < self.board.shape[0] and 0 <= nc < self.board.shape[1]):
                 continue
 
-            char_at_new_pos = self.board[nr][nc]
+            char_at_new_pos_ord = self.board[nr, nc]
 
-            if char_at_new_pos == self.WALL:
+            if char_at_new_pos_ord == self.ORD_WALL:
                 continue
-            elif char_at_new_pos == self.BOX:
+            elif char_at_new_pos_ord == self.ORD_BOX:
                 # Check boundaries and content for box's new position (one step further)
                 bnr, bnc = nr + dr, nc + dc
-                if not (0 <= bnr < len(self.board) and 0 <= bnc < len(self.board[0])):
+                if not (0 <= bnr < self.board.shape[0] and 0 <= bnc < self.board.shape[1]):
                     continue
 
-                char_behind_box = self.board[bnr][bnc]
-                if char_behind_box == self.WALL or char_behind_box == self.BOX:
+                char_behind_box_ord = self.board[bnr, bnc]
+                if char_behind_box_ord == self.ORD_WALL or char_behind_box_ord == self.ORD_BOX:
                     continue
 
             candidate_moves.append(move_name)
 
         final_valid_moves = []
         for move_name in candidate_moves:
-            temp_player_pos = list(self.player_pos) # Use a copy for simulation
-            temp_board = [row[:] for row in self.board] # Use a deep copy for simulation
+            # temp_player_pos is already a tuple, so no need to list() it.
+            # self.player_pos is also a tuple.
+            temp_board = self.board.copy() # Use NumPy's copy method for arrays
 
-            simulated_board, _ = self._simulate_move_on_temp_board(temp_board, temp_player_pos, move_name)
+            simulated_board, _ = self._simulate_move_on_temp_board(temp_board, self.player_pos, move_name)
 
             is_resulting_deadlock = self._is_deadlock(simulated_board)
             if not is_resulting_deadlock:
@@ -221,65 +237,65 @@ class BoxobanGame:
         if action not in self.ACTION_MAP:
              return False
 
-        r_player, c_player = self.player_pos
+        r_player, c_player = self.player_pos # player_pos is a tuple (r,c)
         dr, dc = self.ACTION_MAP[action]
 
         nr, nc = r_player + dr, c_player + dc
 
         # Check if the move is actually valid according to game rules
         # This re-confirms the logic from get_valid_moves essentially
-        if not (0 <= nr < len(self.board) and 0 <= nc < len(self.board[0])):
+        if not (0 <= nr < self.board.shape[0] and 0 <= nc < self.board.shape[1]):
             return False
 
-        destination_char = self.board[nr][nc]
+        destination_char_ord = self.board[nr, nc]
 
-        if destination_char == self.WALL:
+        if destination_char_ord == self.ORD_WALL:
             return False
 
-        if destination_char == self.BOX:
+        if destination_char_ord == self.ORD_BOX:
             bnr, bnc = nr + dr, nc + dc
-            if not (0 <= bnr < len(self.board) and 0 <= bnc < len(self.board[0])):
+            if not (0 <= bnr < self.board.shape[0] and 0 <= bnc < self.board.shape[1]):
                 return False
 
-            char_behind_box = self.board[bnr][bnc]
-            if char_behind_box == self.WALL or char_behind_box == self.BOX:
+            char_behind_box_ord = self.board[bnr, bnc]
+            if char_behind_box_ord == self.ORD_WALL or char_behind_box_ord == self.ORD_BOX:
                 return False
 
-            self.board[bnr][bnc] = self.BOX # Move the box
+            self.board[bnr, bnc] = self.ORD_BOX # Move the box
 
         # Update player's old position
-        self.board[r_player][c_player] = self.TARGET if (r_player, c_player) in self._targets else self.EMPTY
+        self.board[r_player, c_player] = self.ORD_TARGET if (r_player, c_player) in self._targets else self.ORD_EMPTY
 
         # Update player's new position
-        self.board[nr][nc] = self.PLAYER
-        self.player_pos = [nr, nc]
+        self.board[nr, nc] = self.ORD_PLAYER
+        self.player_pos = (nr, nc) # Update player_pos to the new tuple
 
         return True
 
     def is_solved(self):
         # Condition 1: All targets must be covered by boxes.
         for tr, tc in self._targets:
-            if self.board[tr][tc] != self.BOX:
+            if self.board[tr, tc] != self.ORD_BOX: # Compare with ORD_BOX
                 return False
 
         # Condition 2: No boxes should be on non-target squares.
-        # (This is often redundant if num_boxes == num_targets and all targets are covered,
-        # but good for robustness).
-        for r_idx, row in enumerate(self.board):
-            for c_idx, char_code in enumerate(row):
-                if char_code == self.BOX and (r_idx, c_idx) not in self._targets:
+        for r_idx in range(self.board.shape[0]):
+            for c_idx in range(self.board.shape[1]):
+                if self.board[r_idx, c_idx] == self.ORD_BOX and (r_idx, c_idx) not in self._targets:
                     return False # A box is on a non-target square
         return True
 
-    def _is_deadlock(self, board):
+    def _is_deadlock(self, board: np.ndarray): # board parameter is a NumPy array
         # Helper function to check if a position is a wall
         def is_wall(r, c):
-            return not (0 <= r < len(board) and 0 <= c < len(board[0])) or \
-                   board[r][c] == self.WALL
+            # Check array bounds first
+            if not (0 <= r < board.shape[0] and 0 <= c < board.shape[1]):
+                return True # Out of bounds is like a wall
+            return board[r, c] == self.ORD_WALL # Compare with ORD_WALL
 
-        for r, row in enumerate(board):
-            for c, char_code in enumerate(row):
-                if char_code == self.BOX:
+        for r in range(board.shape[0]):
+            for c in range(board.shape[1]):
+                if board[r, c] == self.ORD_BOX: # Compare with ORD_BOX
                     # If the box is on a target, it's not a deadlock from this box's perspective
                     if (r, c) in self._targets:
                         continue
@@ -293,29 +309,29 @@ class BoxobanGame:
                         # This is a simple corner, and the box is not on a target.
                         return True
 
-                    # Frozen Against a Wall Deadlock (Exact match to issue snippet logic)
-                    height = len(board)
-                    width = len(board[0])
+                    # Frozen Against a Wall Deadlock
+                    height = board.shape[0]
+                    width = board.shape[1]
 
                     # Rule 1: Vertical Wall Freeze (North or South wall)
                     if is_wall(r - 1, c) or is_wall(r + 1, c): # Box is against a North or South wall
                         can_move_out_vertical = False
                         # Scan Left
                         temp_c = c
-                        while temp_c - 1 >= 0 and board[r][temp_c - 1] != self.WALL:
+                        while temp_c - 1 >= 0 and board[r, temp_c - 1] != self.ORD_WALL:
                             if (r, temp_c - 1) in self._targets:
                                 can_move_out_vertical = True; break
-                            if board[r][temp_c - 1] == self.BOX: # Blocked by another box
+                            if board[r, temp_c - 1] == self.ORD_BOX: # Blocked by another box
                                 break
                             temp_c -= 1
 
                         if not can_move_out_vertical:
                             # Scan Right
                             temp_c = c
-                            while temp_c + 1 < width and board[r][temp_c + 1] != self.WALL:
+                            while temp_c + 1 < width and board[r, temp_c + 1] != self.ORD_WALL:
                                 if (r, temp_c + 1) in self._targets:
                                     can_move_out_vertical = True; break
-                                if board[r][temp_c + 1] == self.BOX: # Blocked by another box
+                                if board[r, temp_c + 1] == self.ORD_BOX: # Blocked by another box
                                     break
                                 temp_c += 1
 
@@ -327,20 +343,20 @@ class BoxobanGame:
                         can_move_out_horizontal = False
                         # Scan Up
                         temp_r = r
-                        while temp_r - 1 >= 0 and board[temp_r - 1][c] != self.WALL:
+                        while temp_r - 1 >= 0 and board[temp_r - 1, c] != self.ORD_WALL:
                             if (temp_r - 1, c) in self._targets:
                                 can_move_out_horizontal = True; break
-                            if board[temp_r - 1][c] == self.BOX: # Blocked by another box
+                            if board[temp_r - 1, c] == self.ORD_BOX: # Blocked by another box
                                 break
                             temp_r -= 1
 
                         if not can_move_out_horizontal:
                             # Scan Down
                             temp_r = r
-                            while temp_r + 1 < height and board[temp_r + 1][c] != self.WALL:
+                            while temp_r + 1 < height and board[temp_r + 1, c] != self.ORD_WALL:
                                 if (temp_r + 1, c) in self._targets:
                                     can_move_out_horizontal = True; break
-                                if board[temp_r + 1][c] == self.BOX: # Blocked by another box
+                                if board[temp_r + 1, c] == self.ORD_BOX: # Blocked by another box
                                     break
                                 temp_r += 1
 
@@ -348,24 +364,17 @@ class BoxobanGame:
                             return True # Deadlock: Frozen against E/W wall
 
                     # 2x2 Box Deadlock
-                    # Check for a 2x2 square of boxes. If such a square exists and none are on a goal, it's a deadlock.
-                    # More strongly: if a 2x2 of boxes exists, it's a deadlock if not ALL of them are on goals.
-                    # Even more strongly: any 2x2 of boxes is an immediate deadlock as none can be moved.
-                    # Let's check if (r,c), (r+1,c), (r,c+1), (r+1,c+1) are all boxes.
-                    # The loop is iterating (r,c) for a box. So we check its neighbors.
-                    if board[r][c] == self.BOX: # Current is a box
-                        # Check (r, c+1), (r+1, c), (r+1, c+1)
-                        if (r + 1 < len(board) and c + 1 < len(board[0]) and
-                            board[r][c+1] == self.BOX and
-                            board[r+1][c] == self.BOX and
-                            board[r+1][c+1] == self.BOX):
-                            # Found a 2x2 group of boxes.
-                            # According to the issue: "if all four squares are boxes, and none of them are on a goal square"
-                            # However, a 2x2 of boxes is always a deadlock unless the game is already solved by this 2x2.
-                            # If any of these 4 boxes is NOT on a target, it's a deadlock.
-                            if not ((r,c) in self._targets and \
-                                    (r,c+1) in self._targets and \
-                                    (r+1,c) in self._targets and \
-                                    (r+1,c+1) in self._targets):
-                                return True
+                    # Current position (r,c) is a box. Check its neighbors.
+                    # Need to ensure neighbors are within bounds before checking type.
+                    if (r + 1 < height and c + 1 < width and # Check bounds for all 4 cells
+                        board[r, c+1] == self.ORD_BOX and    # Box to the right
+                        board[r+1, c] == self.ORD_BOX and    # Box below
+                        board[r+1, c+1] == self.ORD_BOX):   # Box diagonally down-right
+                        # Found a 2x2 group of boxes.
+                        # If any of these 4 boxes is NOT on a target, it's a deadlock.
+                        if not ((r,c) in self._targets and \
+                                (r,c+1) in self._targets and \
+                                (r+1,c) in self._targets and \
+                                (r+1,c+1) in self._targets):
+                            return True
         return False
