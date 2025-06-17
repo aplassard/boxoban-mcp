@@ -67,7 +67,11 @@ class TestGameInterface(unittest.TestCase):
         #    State: #####\n#  @*#\n##### (Player, Box on Target)
 
         actions = ['right', 'right']
-        expected_final_state = "#####\n#  @*#\n#####" # P(1,3), B(1,4) on T(1,4)
+        # solvable_setup.txt lines: "#####" (len 5), "#@$ .#" (len 6). So, max_len = 6.
+        # get_game_state pads all lines to max_len.
+        # The middle line after actions, "#  @*#", is also length 6.
+        # Padded "#####" becomes "##### ".
+        expected_final_state = "##### \n#  @*#\n##### " # P(1,3), B(1,4) on T(1,4)
 
         result = self.action_interface.take_action_list(actions)
 
