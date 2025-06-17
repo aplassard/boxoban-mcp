@@ -96,31 +96,31 @@ class GameInterface:
     def calculate_greedy_score(self) -> float:
         """
         Calculates a heuristic score based on the Manhattan distance between boxes and goals.
+        Uses the internal game board representation for efficiency.
 
         Returns:
             The calculated heuristic score.
         """
-        board_str = self.game.get_game_state()
-        board = [list(row) for row in board_str.strip().split('\n')]
-
-        rows = len(board)
-        cols = len(board[0])
+        # Access internal game state directly
+        # self.game.board is a NumPy array of ord(char)
+        # self.game._targets is a set of (r, c) tuples
 
         box_locs = []
-        goal_locs = []
+        goal_locs = [] # All target locations
 
-        for r in range(rows):
-            for c in range(cols):
-                if c < len(board[r]): # Check if column index is valid for the current row
-                    char = board[r][c]
-                    if char == '$':  # Box
-                        box_locs.append((r, c))
-                    elif char == '.':  # Goal
-                        goal_locs.append((r, c))
-                    elif char == '*':  # Box on goal
-                        box_locs.append((r, c))
-                        goal_locs.append((r, c))
-                # If c >= len(board[r]), it's part of a jagged array from parsing, treat as empty space
+        # Find all target locations first
+        for r_idx, c_idx in self.game._targets:
+            goal_locs.append((r_idx, c_idx))
+
+        # Find all box locations
+        # Iterate through the board to find boxes
+        for r_idx in range(self.game.board.shape[0]):
+            for c_idx in range(self.game.board.shape[1]):
+                if self.game.board[r_idx, c_idx] == self.game.ORD_BOX:
+                    box_locs.append((r_idx, c_idx))
+                    # If a box is on a location that is also a target,
+                    # it's already implicitly handled by goal_locs containing all targets.
+                    # The cost matrix will correctly assign a distance of 0 if a box is on a goal.
 
         # If there are no boxes, the score is 0 (puzzle solved or trivial).
         if not box_locs:
@@ -131,8 +131,6 @@ class GameInterface:
             return float('inf')
 
         # If there are more boxes than goals, it's an impossible state for MCP.
-        # (If len(box_locs) < len(goal_locs), a score can still be computed,
-        # as each box can be assigned to a unique goal)
         if len(box_locs) > len(goal_locs):
             return float('inf')
 
