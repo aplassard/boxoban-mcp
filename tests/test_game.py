@@ -732,3 +732,21 @@ class TestDeadlockDetection(unittest.TestCase):
     def test_gvm_allows_push_to_goal_near_wall(self):
         game = BoxobanGame.load_game_from_file("tests/data/gvm_allows_push_to_goal_near_wall.txt")
         self.assertIn('down', game.get_valid_moves())
+
+def test_get_valid_moves_puzzle_medium_train_0_42():
+    """
+    Tests the specific puzzle medium/train/0/42 which was the subject of an issue.
+    It expects ['left', 'right'] as valid moves after the deadlock logic refinement.
+    """
+    # This test assumes it's run from the repository root where 'puzzles/' is accessible.
+    game = BoxobanGame.load_game_from_params(
+        difficulty="medium",
+        split="train",
+        puzzle_set_num=0,
+        puzzle_num=42
+    )
+    expected_moves = ['left', 'right']
+    actual_moves = game.get_valid_moves()
+    # Sort for comparison to ignore order issues
+    assert sorted(actual_moves) == sorted(expected_moves), \
+        f"Expected moves {sorted(expected_moves)}, but got {sorted(actual_moves)}"

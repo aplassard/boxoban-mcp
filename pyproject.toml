@@ -5,6 +5,7 @@ description = "A Python game engine for Boxoban puzzles."
 readme = "README.md"
 requires-python = ">=3.12" # Make sure this matches .python-version if present
 dependencies = [
+    "ipython>=9.3.0",
     "numpy>=2.3.0",
     "scipy>=1.15.3",
 ]
@@ -28,4 +29,12 @@ pythonpath = [
 ]
 testpaths = [
     "tests",
+]
+
+[tool.uv.sources]
+boxoban-mcp = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "boxoban-mcp",
 ]
