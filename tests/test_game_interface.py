@@ -1,4 +1,6 @@
 import unittest
+import io
+import contextlib
 import json # Though direct json output isn't being tested for structure yet, good to have if needed.
 from src.boxoban_mcp.game import BoxobanGame
 from src.boxoban_mcp.game_interface import GameInterface
@@ -194,6 +196,34 @@ class TestGameInterface(unittest.TestCase):
         game = BoxobanGame.load_game_from_file("tests/data/iface_heuristic_no_boxes.txt")
         interface = GameInterface(game)
         self.assertEqual(interface.get_heuristic_score(), 0.0)
+
+    def test_pretty_print_game_state(self):
+        """Test the pretty_print_game_state method for correct formatting."""
+        # Board string: "##\n@.#\n##"
+        # BoxobanGame._parse_board_string pads rows. max_len will be 3.
+        # Game state becomes: "## \n@.#\n## "
+        # pretty_print_game_state uses len(rows[0]) for num_cols, so 3.
+        board_string = "##\n@.#\n##"
+        game = BoxobanGame(board_string_input=board_string) # Use board_string_input
+        interface = GameInterface(game)
+
+        expected_output_lines = [
+            "+---+---+---+",
+            "| # | # |   |",
+            "+---+---+---+",
+            "| @ | . | # |",
+            "+---+---+---+",
+            "| # | # |   |",
+            "+---+---+---+"
+        ]
+        expected_output = "\n".join(expected_output_lines) + "\n"
+
+        stdout_capture = io.StringIO()
+        with contextlib.redirect_stdout(stdout_capture):
+            interface.pretty_print_game_state()
+
+        captured_output = stdout_capture.getvalue()
+        self.assertEqual(captured_output, expected_output)
 
 if __name__ == '__main__':
     unittest.main()

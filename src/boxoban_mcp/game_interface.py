@@ -159,3 +159,39 @@ class GameInterface:
             The heuristic score as a float.
         """
         return self.calculate_greedy_score()
+
+    def pretty_print_game_state(self):
+        game_state_str = self.game.get_game_state()
+        if not game_state_str:
+            print("Empty game state.")
+            return
+
+        rows = game_state_str.strip().split('\n')
+        if not rows or not rows[0]:
+            print("Game state has no rows or the first row is empty.")
+            return
+
+        num_cols = len(rows[0])
+        if num_cols == 0:
+            print("Game state has rows but no columns.")
+            return
+
+        # Create the horizontal border
+        horizontal_border = "+" + "---+" * num_cols
+
+        # Print the top border
+        print(horizontal_border)
+
+        for row_str in rows:
+            # Ensure all rows are processed consistently, even if shorter than num_cols
+            # This might happen if the game state string is not perfectly rectangular,
+            # though get_game_state() from BoxobanGame should produce rectangular output.
+            # We will format based on num_cols derived from the first row.
+
+            formatted_row_parts = []
+            for i in range(num_cols):
+                char = row_str[i] if i < len(row_str) else ' ' # Use space if row is shorter
+                formatted_row_parts.append(f" {char} ")
+
+            print("|" + "|".join(formatted_row_parts) + "|")
+            print(horizontal_border)
