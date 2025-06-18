@@ -204,7 +204,7 @@ class TestGameInterface(unittest.TestCase):
         # Game state becomes: "## \n@.#\n## "
         # pretty_print_game_state uses len(rows[0]) for num_cols, so 3.
         board_string = "##\n@.#\n##"
-        game = BoxobanGame(board_string_input=board_string) # Use board_string_input
+        game = BoxobanGame(board_string) # Use board_string
         interface = GameInterface(game)
 
         expected_output_lines = [
@@ -224,6 +224,145 @@ class TestGameInterface(unittest.TestCase):
 
         captured_output = stdout_capture.getvalue()
         self.assertEqual(captured_output, expected_output)
+
+class TestGetValidMoves(unittest.TestCase):
+    def test_get_valid_moves_open_area(self):
+        """Test get_valid_moves when player is in an open area."""
+        simple_board_open = """#####
+#   #
+# @ #
+#   #
+#####"""
+        # Player is at (2,2) in a 5x5 grid (0-indexed)
+        # Game pads this to:
+        # #####
+        #   #
+        # @ #
+        #   #
+        # #####
+        # Player at (2,2)
+        # Up to (1,2) ' ' -> valid
+        # Down to (3,2) ' ' -> valid
+        # Left to (2,1) ' ' -> valid
+        # Right to (2,3) ' ' -> valid
+        game = BoxobanGame(simple_board_open)
+        interface = GameInterface(game)
+        moves = interface.get_valid_moves()
+        expected_moves = {'up', 'down', 'left', 'right'}
+        self.assertEqual(set(moves), expected_moves, f"Expected {expected_moves}, got {set(moves)}")
+
+    def test_get_valid_moves_cornered_by_wall(self):
+        """Test get_valid_moves when player is cornered by walls."""
+        board_player_cornered = """###
+#@#
+###"""
+        # Player at (1,1) in 3x3 grid
+        # All adjacent cells are walls.
+        game = BoxobanGame(board_player_cornered)
+        interface = GameInterface(game)
+        moves = interface.get_valid_moves()
+        expected_moves = set()
+        self.assertEqual(set(moves), expected_moves, f"Expected {expected_moves}, got {set(moves)}")
+
+    def test_get_valid_moves_partially_blocked_by_wall(self):
+        """Test get_valid_moves when player is partially blocked by walls."""
+        board_player_partially_blocked = """###
+#@ #
+## #"""
+        # Player at (1,1)
+        # Game state after parsing (player at (1,1)):
+        # ###
+        # @ #
+        # ## #
+        # Up (0,1) is # -> blocked
+        # Down (2,1) is # -> blocked
+        # Left (1,0) is # -> blocked
+        # Right (1,2) is ' ' -> valid
+        game = BoxobanGame(board_player_partially_blocked)
+        interface = GameInterface(game)
+        moves = interface.get_valid_moves()
+        expected_moves = {'right'}
+        self.assertEqual(set(moves), expected_moves, f"Expected {expected_moves}, got {set(moves)}")
+
+    def test_get_valid_moves_push_box_open(self):
+        """Test get_valid_moves when player can push a box into an empty space."""
+        board_player_next_to_box_can_push = """
+        #####
+        # @$#
+        #   #
+        #####
+        """
+        # Player at (1,2), Box at (1,3), Empty space for box at (1,4) (end of # @$#)
+        # Parsed board (player at (1,2)):
+        # #####
+        #  @$ #  <- Note: original was # @$#, game might parse space before @ based on raw string
+        # #   #      BoxobanGame._parse_board_string strips lines then processes.
+        # #####      The player is at (1,2) relative to " @$#".
+        # Let's re-verify player position based on code:
+        # BoxobanGame `_parse_board_string` uses `strip()` on lines.
+        # `simple_board_open` has " # @ # ". Player will be at (2,3) of that line.
+        # For `board_player_next_to_box_can_push`
+        # line 1: "#####"
+        # line 2: "# @$#" -> player at (1,2), box at (1,3)
+        # line 3: "#   #"
+        # line 4: "#####"
+        # Player at (1,2).
+        # Up to (0,2) is # -> blocked.
+        # Down to (2,2) is ' ' -> valid.
+        # Left to (1,1) is ' ' -> valid.
+        # Right to (1,3) is $, box moves to (1,4) which is # -> push blocked by wall.
+        # The prompt description for this test case: "Assert that the returned list includes 'right' (to push the box)"
+        # This implies the space after the box should be empty.
+        # The board string "# @$#" means the box is at (1,3) and (1,4) is '#'.
+        # Let's adjust the board to match the intent:
+        board_player_next_to_box_can_push_revised = """#####
+# @$ #
+#    #
+#####"""
+        # Player at (1,2), Box at (1,3), Empty at (1,4)
+        # Up: (0,2) is # -> blocked
+        # Down: (2,2) is ' ' -> valid
+        # Left: (1,1) is ' ' -> valid
+        # Right: (1,3) is $, box to (1,4) is ' ' -> valid (push)
+        game = BoxobanGame(board_player_next_to_box_can_push_revised)
+        interface = GameInterface(game)
+        moves = interface.get_valid_moves()
+        expected_moves = {'down', 'left', 'right'}
+        self.assertEqual(set(moves), expected_moves, f"Expected {expected_moves}, got {set(moves)}")
+
+    def test_get_valid_moves_push_box_blocked_by_wall(self):
+        """Test get_valid_moves when a box push is blocked by a wall."""
+        board_player_next_to_box_wall_block = """#####
+#@$##
+#   #
+#####"""
+        # Player at (1,1), Box at (1,2), Wall at (1,3)
+        # Up: (0,1) is # -> blocked
+        # Down: (2,1) is ' ' -> valid
+        # Left: (1,0) is # -> blocked
+        # Right: (1,2) is $, box to (1,3) is # -> push blocked
+        game = BoxobanGame(board_player_next_to_box_wall_block)
+        interface = GameInterface(game)
+        moves = interface.get_valid_moves()
+        expected_moves = {'down'}
+        self.assertEqual(set(moves), expected_moves, f"Expected {expected_moves}, got {set(moves)}")
+
+    def test_get_valid_moves_push_box_blocked_by_another_box(self):
+        """Test get_valid_moves when a box push is blocked by another box."""
+        board_player_next_to_box_box_block = """######
+#@$$ #
+#    #
+######"""
+        # Player at (1,1), Box1 at (1,2), Box2 at (1,3)
+        # Up: (0,1) is # -> blocked
+        # Down: (2,1) is ' ' -> valid
+        # Left: (1,0) is # -> blocked
+        # Right: (1,2) is $, box1 to (1,3) is $ -> push blocked
+        game = BoxobanGame(board_player_next_to_box_box_block)
+        interface = GameInterface(game)
+        moves = interface.get_valid_moves()
+        expected_moves = {'down'}
+        self.assertEqual(set(moves), expected_moves, f"Expected {expected_moves}, got {set(moves)}")
 
 if __name__ == '__main__':
     unittest.main()

@@ -93,6 +93,15 @@ class GameInterface:
             "current_game_state": self.game.get_game_state()
         }
 
+    def get_valid_moves(self) -> list[str]:
+        """
+        Returns a list of valid action strings for the current game state.
+
+        Returns:
+            A list of strings, where each string is a valid action (e.g., 'up', 'down').
+        """
+        return self.game.get_valid_moves()
+
     def calculate_greedy_score(self) -> float:
         """
         Calculates a heuristic score based on the Manhattan distance between boxes and goals.
