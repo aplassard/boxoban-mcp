@@ -247,9 +247,11 @@ class TestGetValidMoves(unittest.TestCase):
         # Right to (2,3) ' ' -> valid
         game = BoxobanGame(simple_board_open)
         interface = GameInterface(game)
-        moves = interface.get_valid_moves()
+        result_dict = interface.get_valid_moves()
+        self.assertIn("valid_moves", result_dict)
+        self.assertIsInstance(result_dict["valid_moves"], list)
         expected_moves = {'up', 'down', 'left', 'right'}
-        self.assertEqual(set(moves), expected_moves, f"Expected {expected_moves}, got {set(moves)}")
+        self.assertEqual(set(result_dict["valid_moves"]), expected_moves, f"Expected {expected_moves}, got {set(result_dict['valid_moves'])}")
 
     def test_get_valid_moves_cornered_by_wall(self):
         """Test get_valid_moves when player is cornered by walls."""
@@ -260,9 +262,11 @@ class TestGetValidMoves(unittest.TestCase):
         # All adjacent cells are walls.
         game = BoxobanGame(board_player_cornered)
         interface = GameInterface(game)
-        moves = interface.get_valid_moves()
+        result_dict = interface.get_valid_moves()
+        self.assertIn("valid_moves", result_dict)
+        self.assertIsInstance(result_dict["valid_moves"], list)
         expected_moves = set()
-        self.assertEqual(set(moves), expected_moves, f"Expected {expected_moves}, got {set(moves)}")
+        self.assertEqual(set(result_dict["valid_moves"]), expected_moves, f"Expected {expected_moves}, got {set(result_dict['valid_moves'])}")
 
     def test_get_valid_moves_partially_blocked_by_wall(self):
         """Test get_valid_moves when player is partially blocked by walls."""
@@ -280,9 +284,11 @@ class TestGetValidMoves(unittest.TestCase):
         # Right (1,2) is ' ' -> valid
         game = BoxobanGame(board_player_partially_blocked)
         interface = GameInterface(game)
-        moves = interface.get_valid_moves()
+        result_dict = interface.get_valid_moves()
+        self.assertIn("valid_moves", result_dict)
+        self.assertIsInstance(result_dict["valid_moves"], list)
         expected_moves = {'right'}
-        self.assertEqual(set(moves), expected_moves, f"Expected {expected_moves}, got {set(moves)}")
+        self.assertEqual(set(result_dict["valid_moves"]), expected_moves, f"Expected {expected_moves}, got {set(result_dict['valid_moves'])}")
 
     def test_get_valid_moves_push_box_open(self):
         """Test get_valid_moves when player can push a box into an empty space."""
@@ -326,9 +332,11 @@ class TestGetValidMoves(unittest.TestCase):
         # Right: (1,3) is $, box to (1,4) is ' ' -> valid (push)
         game = BoxobanGame(board_player_next_to_box_can_push_revised)
         interface = GameInterface(game)
-        moves = interface.get_valid_moves()
+        result_dict = interface.get_valid_moves()
+        self.assertIn("valid_moves", result_dict)
+        self.assertIsInstance(result_dict["valid_moves"], list)
         expected_moves = {'down', 'left', 'right'}
-        self.assertEqual(set(moves), expected_moves, f"Expected {expected_moves}, got {set(moves)}")
+        self.assertEqual(set(result_dict["valid_moves"]), expected_moves, f"Expected {expected_moves}, got {set(result_dict['valid_moves'])}")
 
     def test_get_valid_moves_push_box_blocked_by_wall(self):
         """Test get_valid_moves when a box push is blocked by a wall."""
@@ -343,9 +351,11 @@ class TestGetValidMoves(unittest.TestCase):
         # Right: (1,2) is $, box to (1,3) is # -> push blocked
         game = BoxobanGame(board_player_next_to_box_wall_block)
         interface = GameInterface(game)
-        moves = interface.get_valid_moves()
+        result_dict = interface.get_valid_moves()
+        self.assertIn("valid_moves", result_dict)
+        self.assertIsInstance(result_dict["valid_moves"], list)
         expected_moves = {'down'}
-        self.assertEqual(set(moves), expected_moves, f"Expected {expected_moves}, got {set(moves)}")
+        self.assertEqual(set(result_dict["valid_moves"]), expected_moves, f"Expected {expected_moves}, got {set(result_dict['valid_moves'])}")
 
     def test_get_valid_moves_push_box_blocked_by_another_box(self):
         """Test get_valid_moves when a box push is blocked by another box."""
@@ -360,9 +370,11 @@ class TestGetValidMoves(unittest.TestCase):
         # Right: (1,2) is $, box1 to (1,3) is $ -> push blocked
         game = BoxobanGame(board_player_next_to_box_box_block)
         interface = GameInterface(game)
-        moves = interface.get_valid_moves()
+        result_dict = interface.get_valid_moves()
+        self.assertIn("valid_moves", result_dict)
+        self.assertIsInstance(result_dict["valid_moves"], list)
         expected_moves = {'down'}
-        self.assertEqual(set(moves), expected_moves, f"Expected {expected_moves}, got {set(moves)}")
+        self.assertEqual(set(result_dict["valid_moves"]), expected_moves, f"Expected {expected_moves}, got {set(result_dict['valid_moves'])}")
 
 if __name__ == '__main__':
     unittest.main()

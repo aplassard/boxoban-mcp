@@ -93,14 +93,17 @@ class GameInterface:
             "current_game_state": self.game.get_game_state()
         }
 
-    def get_valid_moves(self) -> list[str]:
+    def get_valid_moves(self) -> dict[str, list[str]]: # Update return type hint
         """
-        Returns a list of valid action strings for the current game state.
+        Returns a dictionary containing a list of valid action strings for the current game state.
 
         Returns:
-            A list of strings, where each string is a valid action (e.g., 'up', 'down').
+            A dictionary with a single key "valid_moves",
+            whose value is a list of strings, where each string is a valid action
+            (e.g., {'valid_moves': ['up', 'down']}).
         """
-        return self.game.get_valid_moves()
+        moves = self.game.get_valid_moves()
+        return {"valid_moves": moves}
 
     def calculate_greedy_score(self) -> float:
         """
