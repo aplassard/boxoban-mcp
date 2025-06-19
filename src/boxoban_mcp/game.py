@@ -1,7 +1,14 @@
 import os
 import numpy as np
+import zipfile
+import tempfile
+import shutil
+import requests
 
 class BoxobanGame:
+    BOXOBAN_LEVELS_URL = "https://github.com/google-deepmind/boxoban-levels/archive/refs/heads/master.zip"
+    CACHE_DIR = os.path.join(tempfile.gettempdir(), "boxoban_cache")
+
     EMPTY = ' '
     WALL = '#'
     PLAYER = '@'
@@ -148,8 +155,87 @@ class BoxobanGame:
         except ValueError:
             raise ValueError(f"puzzle_set_num must be a number or string representing a number. Got: {puzzle_set_num}")
 
-        file_path = os.path.join("puzzles", difficulty, split, puzzle_set_filename)
-        return cls.load_game_from_file(file_path, puzzle_index=puzzle_num)
+        # Create cache directory if it doesn't exist
+        if not os.path.exists(cls.CACHE_DIR):
+            os.makedirs(cls.CACHE_DIR)
+
+        cached_file_path = os.path.join(cls.CACHE_DIR, difficulty, split, puzzle_set_filename)
+
+        if os.path.exists(cached_file_path):
+            return cls.load_game_from_file(cached_file_path, puzzle_index=puzzle_num)
+        else:
+            # Download and extract puzzles
+            print(f"Cache miss for {cached_file_path}. Downloading levels...")
+            response = requests.get(cls.BOXOBAN_LEVELS_URL, stream=True)
+            response.raise_for_status()  # Ensure we got a valid response
+
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                zip_path = os.path.join(tmp_dir, "boxoban_levels.zip")
+                with open(zip_path, "wb") as f:
+                    shutil.copyfileobj(response.raw, f)
+
+                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                    zip_ref.extractall(tmp_dir)
+
+                # Attempt to find the correct extracted folder name
+                extracted_folder_name = None
+                for name in os.listdir(tmp_dir):
+                    if 'boxoban-' in name and os.path.isdir(os.path.join(tmp_dir, name)):
+                        extracted_folder_name = name
+                        break
+
+                if not extracted_folder_name:
+                    raise FileNotFoundError(f"Could not find expected 'boxoban-(levels-)master' directory in {tmp_dir}")
+
+                # Source path of the puzzles within the extracted contents
+                # This path should be the directory containing 'medium', 'unfiltered', etc.
+                source_puzzles_path = os.path.join(tmp_dir, extracted_folder_name)
+
+                # Destination path for the puzzles in the cache
+                # e.g., cls.CACHE_DIR (which is tempfile.gettempdir() / "boxoban_cache")
+                # shutil.copytree will copy the contents of extracted_puzzles_dir into cls.CACHE_DIR/puzzles
+                # We want to copy the 'puzzles' directory itself into CACHE_DIR.
+
+                # Ensure the parent directory for the cached file path exists
+                os.makedirs(os.path.dirname(cached_file_path), exist_ok=True)
+
+                # Copy the specific puzzle set file if only that is needed, or the whole puzzles dir.
+                # The original code expected "puzzles/difficulty/split/file.txt" relative to some root.
+                # The new cache structure is CACHE_DIR/difficulty/split/file.txt.
+                # So we need to copy the entire 'puzzles' directory from extracted_puzzles_dir
+                # to the root of our cache cls.CACHE_DIR.
+
+                # Let's rethink the copy. We want the structure CACHE_DIR/difficulty/split/file.txt
+                # The zip file has boxoban-levels-master/puzzles/difficulty/split/file.txt
+                # So, we should copy the contents of extracted_puzzles_dir (which is .../puzzles)
+                # into cls.CACHE_DIR.
+
+                if os.path.exists(cls.CACHE_DIR): # If cache dir was created by a parallel process
+                    pass # it's fine, shutil.copytree might complain if dst exists and is not empty
+
+                # Copy the entire 'puzzles' directory content into CACHE_DIR
+                # This will create CACHE_DIR/difficulty/split/...
+                # source_puzzles_path is now defined above with debugging
+
+                # shutil.copytree expects the destination directory (cls.CACHE_DIR) to not exist or be empty.
+                # Since we want to populate it with the contents of source_puzzles_path,
+                # we iterate through the contents of source_puzzles_path (difficulty folders)
+                # and copy them into cls.CACHE_DIR.
+                for item_name in os.listdir(source_puzzles_path):
+                    s_item = os.path.join(source_puzzles_path, item_name)
+                    d_item = os.path.join(cls.CACHE_DIR, item_name)
+                    if os.path.isdir(s_item):
+                        shutil.copytree(s_item, d_item, dirs_exist_ok=True)
+                    else:
+                        shutil.copy2(s_item, d_item)
+
+            if not os.path.exists(cached_file_path):
+                raise FileNotFoundError(
+                    f"Puzzle file {cached_file_path} not found after download and extraction. "
+                    f"Please check the archive structure and paths."
+                )
+
+            return cls.load_game_from_file(cached_file_path, puzzle_index=puzzle_num)
 
     def get_game_state(self):
         output_rows = []
