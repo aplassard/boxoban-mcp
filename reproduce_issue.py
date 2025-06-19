@@ -1,7 +1,7 @@
 import boxoban_mcp
 
 try:
-    game = boxoban_mcp.BoxobanGame.load_game_from_params(
+    game = boxoban_mcp.GameLoader.load_game_from_params(
         difficulty="medium",
         split="train",
         puzzle_set_num=0,

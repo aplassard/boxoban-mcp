@@ -47,34 +47,40 @@ You can load a game in several ways:
 
 1.  **From a string:**
     ```python
-    from boxoban_mcp.game import BoxobanGame
+    from boxoban_mcp import GameLoader # For loading
+    # from boxoban_mcp import BoxobanGame # If you need to type hint or refer to the game class directly
 
     board_string = "####\\n#@$.#\\n####"
     # Represents:
     # ####
     # #@$.#  (Player, Box, Target)
     # ####
-    game = BoxobanGame.load_game_from_string(board_string)
+    game = GameLoader.load_game_from_string(board_string) # Returns a BoxobanGame instance
     ```
 
 2.  **From a file:**
     Puzzle files can contain multiple puzzles, separated by a semicolon and a puzzle number (e.g., `0\nPuzzleData0;1\nPuzzleData1`).
+    The game engine will automatically download and cache puzzle files if they are not found locally.
     ```python
-    from boxoban_mcp.game import BoxobanGame # Assuming it might not be imported yet
+    from boxoban_mcp import GameLoader
 
-    # Assuming 'puzzles/medium/train/000.txt' exists
+    # The engine will attempt to load this from a local cache or download it.
+    # Example: puzzles/medium/train/000.txt
     # And puzzle 0 in that file is "####\\n#@.#\\n####"
-    game = BoxobanGame.load_game_from_file("puzzles/medium/train/000.txt", puzzle_index=0)
+    game = GameLoader.load_game_from_file("medium/train/000.txt", puzzle_index=0)
     ```
     If a file contains only a single puzzle string without a preceding index number, use `puzzle_index=0`.
+    When using `load_game_from_file`, the path provided should be relative to the root of the cached puzzle structure (e.g., `difficulty/split/filename.txt`).
 
 3.  **From parameters:**
-    This method constructs the path to standard puzzle files within the `puzzles/` directory.
+    This is the recommended method for loading standard puzzles. It automatically handles downloading and caching.
+    The game will construct the necessary paths and fetch files from an online repository if not found in the local cache (typically located in your system's temporary directory).
     ```python
-    from boxoban_mcp.game import BoxobanGame # Assuming it might not be imported yet
+    from boxoban_mcp import GameLoader
 
-    # Loads puzzle 12 from puzzles/medium/train/001.txt
-    game = BoxobanGame.load_game_from_params(
+    # Loads puzzle 12 from the 'medium' difficulty, 'train' split, set '001'.
+    # Files will be downloaded and cached if not present locally.
+    game = GameLoader.load_game_from_params( # Corrected: GameLoader
         difficulty="medium",
         split="train",
         puzzle_set_num="001", # or e.g. 1
@@ -142,7 +148,10 @@ This project uses `uv` for package management and `pytest` for testing.
 
 ## Original Dataset Information (Citation)
 
-If you use the underlying Boxoban level dataset in your work (found in the `puzzles/` directory), please cite the original authors:
+If you use the underlying Boxoban level dataset in your work (the game automatically downloads levels based on this dataset's structure), please cite the original authors:
+
+**Note on the local `puzzles/` directory:**
+The `puzzles/` directory included in this repository is for reference and historical purposes. The game engine now automatically downloads and caches the required puzzle files from an online source into a temporary directory on your system when `load_game_from_params` (or `load_game_from_file` if the file isn't in the cache) is called. Therefore, the local `puzzles/` directory is no longer actively used by the game logic for loading levels and can be manually removed from your local clone of the repository if desired.
 
 ```bibtex
 @misc{boxobanlevels,
