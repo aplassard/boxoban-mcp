@@ -1,14 +1,7 @@
 import os
 import numpy as np
-import zipfile
-import tempfile
-import shutil
-import requests
 
 class BoxobanGame:
-    BOXOBAN_LEVELS_URL = "https://github.com/google-deepmind/boxoban-levels/archive/refs/heads/master.zip"
-    CACHE_DIR = os.path.join(tempfile.gettempdir(), "boxoban_cache")
-
     EMPTY = ' '
     WALL = '#'
     PLAYER = '@'
@@ -86,156 +79,13 @@ class BoxobanGame:
 
     def _find_player_position(self):
         # Player position is stored based on ORD_PLAYER in the numpy array
+        if self.board is None: # Should not happen if _parse_board_string was called
+            return None
         player_coords = np.where(self.board == self.ORD_PLAYER)
         if player_coords[0].size > 0:
             # Return as a tuple (r, c)
             return (player_coords[0][0], player_coords[1][0])
         return None
-
-    @classmethod
-    def load_game_from_string(cls, board_str):
-        return cls(board_str)
-
-    @classmethod
-    def load_game_from_file(cls, file_path, puzzle_index=0):
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"File not found: {file_path}")
-        with open(file_path, 'r') as f:
-            content = f.read()
-
-        parts = content.strip().split(';')
-        if not parts or (len(parts) == 1 and not parts[0].strip()):
-            raise ValueError(f"No puzzle data found in file: {file_path}")
-
-        found_puzzle_str = None
-        # Use actual newline for prefix matching
-        target_prefix_for_current_index = str(puzzle_index) + "\n"
-
-        if len(parts) == 1:
-            single_part = parts[0].strip()
-            # Split by actual newline to check header
-            header_check_parts = single_part.split('\n', 1)
-            first_line_of_part = header_check_parts[0]
-            is_raw_puzzle = not first_line_of_part.isdigit()
-
-            if puzzle_index == 0:
-                if is_raw_puzzle: # e.g. "####\n#@.#\n####"
-                    found_puzzle_str = single_part
-                elif single_part.startswith(target_prefix_for_current_index): # e.g. "0\n####\n#@.#\n####"
-                    found_puzzle_str = header_check_parts[1].strip() if len(header_check_parts) > 1 else ""
-            # If index > 0, it must have the "N\n" header
-            elif single_part.startswith(target_prefix_for_current_index):
-                 found_puzzle_str = header_check_parts[1].strip() if len(header_check_parts) > 1 else ""
-
-        if found_puzzle_str is None: # Search through multiple parts or if not found in single part logic
-            for part in parts:
-                current_part = part.strip()
-                if current_part.startswith(target_prefix_for_current_index):
-                    # Split by actual newline to extract puzzle string after header
-                    puzzle_content_parts = current_part.split('\n', 1)
-                    found_puzzle_str = puzzle_content_parts[1].strip() if len(puzzle_content_parts) > 1 else ""
-                    break
-
-        if found_puzzle_str is None:
-            # Split by actual newline for displaying available headers
-            available_puzzle_headers = [p.strip().split('\n',1)[0] for p in parts if p.strip()]
-            raise ValueError(
-                f"Puzzle with index {puzzle_index} (expected prefix '{target_prefix_for_current_index.strip()}') "
-                f"not found in {file_path}. File contains {len(parts)} part(s). "
-                f"Available headers/starts: {available_puzzle_headers}"
-            )
-
-        return cls(found_puzzle_str)
-
-    @classmethod
-    def load_game_from_params(cls, difficulty, split, puzzle_set_num, puzzle_num):
-        try:
-            # Format puzzle_set_num to three digits with leading zeros, e.g., "1" -> "001"
-            puzzle_set_filename = f"{int(str(puzzle_set_num).strip()):03d}.txt"
-        except ValueError:
-            raise ValueError(f"puzzle_set_num must be a number or string representing a number. Got: {puzzle_set_num}")
-
-        # Create cache directory if it doesn't exist
-        if not os.path.exists(cls.CACHE_DIR):
-            os.makedirs(cls.CACHE_DIR)
-
-        cached_file_path = os.path.join(cls.CACHE_DIR, difficulty, split, puzzle_set_filename)
-
-        if os.path.exists(cached_file_path):
-            return cls.load_game_from_file(cached_file_path, puzzle_index=puzzle_num)
-        else:
-            # Download and extract puzzles
-            print(f"Cache miss for {cached_file_path}. Downloading levels...")
-            response = requests.get(cls.BOXOBAN_LEVELS_URL, stream=True)
-            response.raise_for_status()  # Ensure we got a valid response
-
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                zip_path = os.path.join(tmp_dir, "boxoban_levels.zip")
-                with open(zip_path, "wb") as f:
-                    shutil.copyfileobj(response.raw, f)
-
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(tmp_dir)
-
-                # Attempt to find the correct extracted folder name
-                extracted_folder_name = None
-                for name in os.listdir(tmp_dir):
-                    if 'boxoban-' in name and os.path.isdir(os.path.join(tmp_dir, name)):
-                        extracted_folder_name = name
-                        break
-
-                if not extracted_folder_name:
-                    raise FileNotFoundError(f"Could not find expected 'boxoban-(levels-)master' directory in {tmp_dir}")
-
-                # Source path of the puzzles within the extracted contents
-                # This path should be the directory containing 'medium', 'unfiltered', etc.
-                source_puzzles_path = os.path.join(tmp_dir, extracted_folder_name)
-
-                # Destination path for the puzzles in the cache
-                # e.g., cls.CACHE_DIR (which is tempfile.gettempdir() / "boxoban_cache")
-                # shutil.copytree will copy the contents of extracted_puzzles_dir into cls.CACHE_DIR/puzzles
-                # We want to copy the 'puzzles' directory itself into CACHE_DIR.
-
-                # Ensure the parent directory for the cached file path exists
-                os.makedirs(os.path.dirname(cached_file_path), exist_ok=True)
-
-                # Copy the specific puzzle set file if only that is needed, or the whole puzzles dir.
-                # The original code expected "puzzles/difficulty/split/file.txt" relative to some root.
-                # The new cache structure is CACHE_DIR/difficulty/split/file.txt.
-                # So we need to copy the entire 'puzzles' directory from extracted_puzzles_dir
-                # to the root of our cache cls.CACHE_DIR.
-
-                # Let's rethink the copy. We want the structure CACHE_DIR/difficulty/split/file.txt
-                # The zip file has boxoban-levels-master/puzzles/difficulty/split/file.txt
-                # So, we should copy the contents of extracted_puzzles_dir (which is .../puzzles)
-                # into cls.CACHE_DIR.
-
-                if os.path.exists(cls.CACHE_DIR): # If cache dir was created by a parallel process
-                    pass # it's fine, shutil.copytree might complain if dst exists and is not empty
-
-                # Copy the entire 'puzzles' directory content into CACHE_DIR
-                # This will create CACHE_DIR/difficulty/split/...
-                # source_puzzles_path is now defined above with debugging
-
-                # shutil.copytree expects the destination directory (cls.CACHE_DIR) to not exist or be empty.
-                # Since we want to populate it with the contents of source_puzzles_path,
-                # we iterate through the contents of source_puzzles_path (difficulty folders)
-                # and copy them into cls.CACHE_DIR.
-                for item_name in os.listdir(source_puzzles_path):
-                    s_item = os.path.join(source_puzzles_path, item_name)
-                    d_item = os.path.join(cls.CACHE_DIR, item_name)
-                    if os.path.isdir(s_item):
-                        shutil.copytree(s_item, d_item, dirs_exist_ok=True)
-                    else:
-                        shutil.copy2(s_item, d_item)
-
-            if not os.path.exists(cached_file_path):
-                raise FileNotFoundError(
-                    f"Puzzle file {cached_file_path} not found after download and extraction. "
-                    f"Please check the archive structure and paths."
-                )
-
-            return cls.load_game_from_file(cached_file_path, puzzle_index=puzzle_num)
 
     def get_game_state(self):
         output_rows = []
