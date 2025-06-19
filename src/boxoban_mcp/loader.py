@@ -13,7 +13,7 @@ class GameLoader:
     Handles loading BoxobanGame instances from various sources,
     including automatic download and caching of puzzle files.
     """
-    BOXOBAN_LEVELS_URL = "https://github.com/google-deepmind/boxoban-levels/archive/refs/heads/master.zip"
+    BOXOBAN_RAW_URL = "https://raw.githubusercontent.com/google-deepmind/boxoban-levels/refs/heads/master/"
     CACHE_DIR = os.path.join(tempfile.gettempdir(), "boxoban_cache")
 
     @classmethod
@@ -107,43 +107,31 @@ class GameLoader:
         if os.path.exists(cached_file_path):
             return cls.load_game_from_file(cached_file_path, puzzle_index=puzzle_num)
         else:
-            print(f"Cache miss for {cached_file_path}. Downloading levels...")
-            response = requests.get(cls.BOXOBAN_LEVELS_URL, stream=True)
-            response.raise_for_status()
+            # Construct the direct download URL
+            direct_url = f"{cls.BOXOBAN_RAW_URL}{difficulty}/{split}/{puzzle_set_filename}"
+            print(f"Cache miss for {cached_file_path}. Downloading from {direct_url}...")
 
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                zip_path = os.path.join(tmp_dir, "boxoban_levels.zip")
-                with open(zip_path, "wb") as f:
-                    shutil.copyfileobj(response.raw, f)
+            try:
+                response = requests.get(direct_url)
+                response.raise_for_status()  # Raise an exception for HTTP errors
+            except requests.exceptions.RequestException as e:
+                raise IOError(f"Failed to download puzzle file from {direct_url}: {e}")
 
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(tmp_dir)
+            # Ensure the cache directory for the file exists
+            os.makedirs(os.path.dirname(cached_file_path), exist_ok=True)
 
-                extracted_folder_name = None
-                for name in os.listdir(tmp_dir):
-                    if 'boxoban-' in name and os.path.isdir(os.path.join(tmp_dir, name)):
-                        extracted_folder_name = name
-                        break
+            # Save the downloaded content to the cache file
+            try:
+                with open(cached_file_path, "wb") as f:
+                    f.write(response.content)
+            except IOError as e:
+                raise IOError(f"Failed to save downloaded puzzle to {cached_file_path}: {e}")
 
-                if not extracted_folder_name:
-                    raise FileNotFoundError(f"Could not find expected 'boxoban-(levels-)master' directory in {tmp_dir}")
-
-                source_puzzles_path = os.path.join(tmp_dir, extracted_folder_name)
-
-                os.makedirs(os.path.dirname(cached_file_path), exist_ok=True)
-
-                for item_name in os.listdir(source_puzzles_path):
-                    s_item = os.path.join(source_puzzles_path, item_name)
-                    d_item = os.path.join(cls.CACHE_DIR, item_name)
-                    if os.path.isdir(s_item):
-                        shutil.copytree(s_item, d_item, dirs_exist_ok=True)
-                    else:
-                        shutil.copy2(s_item, d_item)
-
+            # Verify the file was actually created
             if not os.path.exists(cached_file_path):
                 raise FileNotFoundError(
-                    f"Puzzle file {cached_file_path} not found after download and extraction. "
-                    f"Please check the archive structure and paths."
+                    f"Puzzle file {cached_file_path} not found after download. "
+                    f"Download seemed to succeed but file is missing."
                 )
 
             return cls.load_game_from_file(cached_file_path, puzzle_index=puzzle_num)
