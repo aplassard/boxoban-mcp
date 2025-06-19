@@ -164,3 +164,30 @@ year = "2018"
 Questions regarding the dataset can be directed to Theophane Weber (theophane@google.com).
 
 This is not an official Google product.
+
+## Boxoban MCP Server
+
+A Model Context Protocol (MCP) server for interacting with the Boxoban game is available in `src/boxoban_mcp/server.py`.
+
+This server allows loading Boxoban puzzles and interacting with them using standard MCP tools.
+
+### Running the Server
+
+To run the MCP server locally:
+
+```bash
+python src/boxoban_mcp/server.py
+```
+
+This will start the server, typically on `127.0.0.1:65432`. You can then connect to it using an MCP client or development tools like `mcp dev`.
+
+### Available Tools (partial list)
+
+- `load_game(difficulty: str, split: str, puzzle_set_num: int, puzzle_num: int)`: Loads a specific game.
+- `get_game_state()`: Returns the current board state.
+- `get_valid_moves()`: Lists valid moves.
+- `take_action(action: str)`: Performs an action.
+- `take_action_list(actions: list[str])`: Performs a sequence of actions.
+- `return_full_game_state()`: Provides a comprehensive game state.
+
+(Note: Tool names in the server implementation might slightly differ, e.g., `get_full_game_state` for `return_full_game_state`. Refer to the server code for exact names.)
