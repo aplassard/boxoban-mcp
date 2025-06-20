@@ -18,6 +18,9 @@ dev = [
     "pytest>=8.0",
 ]
 
+[project.scripts]
+boxoban-mcp = "boxoban_mcp.server:main"
+
 # Standard configuration for projects with a 'src' layout using setuptools
 [tool.setuptools.packages.find]
 where = ["src"]  # Look for packages in the 'src' directory
