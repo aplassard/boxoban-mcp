@@ -10,6 +10,7 @@ dependencies = [
     "pytest>=8.4.0",
     "scipy>=1.15.3",
     "requests",
+    "mcp[cli]>=1.9.4",
 ]
 
 [project.optional-dependencies]
