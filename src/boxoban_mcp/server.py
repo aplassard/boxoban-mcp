@@ -10,6 +10,24 @@ game_interface_instance: GameInterface | None = None
 mcp = FastMCP("Boxoban", host="0.0.0.0", port=8080)
 
 @mcp.tool()
+def get_game_rules() -> dict:
+    """
+    Returns the rules of the Boxoban game.
+    This tool does not require a game to be loaded.
+    """
+    rules_string = """1.  **Objective:** The goal is to move every box (`$`) onto a target square (`.`). When a box is on a target, it's represented as `*`.
+2.  **Player:** You control the player (`@`). If the player is on a target, it's represented as `+`.
+3.  **Movement:**
+    *   The player can move up, down, left, or right into an empty square (` `) or onto a target square (`.`).
+    *   The player cannot move into a wall (`#`).
+4.  **Pushing Boxes:**
+    *   The player can push a single box (`$`) if the square immediately beyond the box (in the direction of the push) is either empty or a target.
+    *   The player cannot push a box if the square beyond it is another box or a wall.
+    *   Boxes cannot be pulled.
+5.  **Winning:** The puzzle is solved when all target squares are occupied by boxes. There should be no boxes on non-target squares."""
+    return {"status": "success", "game_rules": rules_string}
+
+@mcp.tool()
 def load_game(difficulty: str, split: str, puzzle_set_num: int, puzzle_num: int) -> dict:
     """
     Loads a Boxoban game instance based on the provided parameters.
@@ -75,17 +93,6 @@ def take_action_list(actions: list[str]) -> dict:
 
     result_dict = game_interface_instance.take_action_list(actions)
     return {"status": "success", **result_dict}
-
-@mcp.tool()
-def get_heuristic_score() -> dict:
-    """
-    Calculates and returns the heuristic score for the current game state.
-    """
-    global game_interface_instance
-    if game_interface_instance is None:
-        return {"status": "error", "message": "No game loaded. Call load_game first."}
-    score = game_interface_instance.get_heuristic_score()
-    return {"status": "success", "heuristic_score": score}
 
 @mcp.tool()
 def get_full_game_state() -> dict:

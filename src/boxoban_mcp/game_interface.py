@@ -1,6 +1,4 @@
 import json
-import numpy as np
-from scipy.optimize import linear_sum_assignment
 from .game import BoxobanGame
 
 class GameInterface:
@@ -104,73 +102,6 @@ class GameInterface:
         """
         moves = self.game.get_valid_moves()
         return {"valid_moves": moves}
-
-    def calculate_greedy_score(self) -> float:
-        """
-        Calculates a heuristic score based on the Manhattan distance between boxes and goals.
-        Uses the internal game board representation for efficiency.
-
-        Returns:
-            The calculated heuristic score.
-        """
-        # Access internal game state directly
-        # self.game.board is a NumPy array of ord(char)
-        # self.game._targets is a set of (r, c) tuples
-
-        box_locs = []
-        goal_locs = [] # All target locations
-
-        # Find all target locations first
-        for r_idx, c_idx in self.game._targets:
-            goal_locs.append((r_idx, c_idx))
-
-        # Find all box locations
-        # Iterate through the board to find boxes
-        for r_idx in range(self.game.board.shape[0]):
-            for c_idx in range(self.game.board.shape[1]):
-                if self.game.board[r_idx, c_idx] == self.game.ORD_BOX:
-                    box_locs.append((r_idx, c_idx))
-                    # If a box is on a location that is also a target,
-                    # it's already implicitly handled by goal_locs containing all targets.
-                    # The cost matrix will correctly assign a distance of 0 if a box is on a goal.
-
-        # If there are no boxes, the score is 0 (puzzle solved or trivial).
-        if not box_locs:
-            return 0.0
-
-        # If there are boxes but no goals, it's an impossible state for MCP.
-        if not goal_locs:
-            return float('inf')
-
-        # If there are more boxes than goals, it's an impossible state for MCP.
-        if len(box_locs) > len(goal_locs):
-            return float('inf')
-
-        # Create a cost matrix: rows are boxes, columns are goals
-        # Cost is Manhattan distance
-        cost_matrix = np.zeros((len(box_locs), len(goal_locs)))
-
-        for i, (br, bc) in enumerate(box_locs):
-            for j, (gr, gc) in enumerate(goal_locs):
-                cost_matrix[i, j] = abs(br - gr) + abs(bc - gc)
-
-        # Use Hungarian algorithm to find the optimal assignment
-        row_ind, col_ind = linear_sum_assignment(cost_matrix)
-
-        # Sum the distances of the optimal assignments
-        score = cost_matrix[row_ind, col_ind].sum()
-
-        return float(score)
-
-    def get_heuristic_score(self) -> float:
-        """
-        Returns the heuristic score for the current game state.
-        This method is a wrapper around calculate_greedy_score.
-
-        Returns:
-            The heuristic score as a float.
-        """
-        return self.calculate_greedy_score()
 
     def pretty_print_game_state(self):
         game_state_str = self.game.get_game_state()
